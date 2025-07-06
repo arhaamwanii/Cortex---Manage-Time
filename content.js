@@ -237,7 +237,4 @@ if (document.readyState === 'loading') {
   init();
 }
 
-// Request notification permission
-if (Notification.permission === 'default') {
-  Notification.requestPermission();
-}
+// Only request notification permission when timer completes, not on every page load
