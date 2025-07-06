@@ -1,6 +1,47 @@
-# 🧠 CORTEX - Smart Pomodoro Timer Chrome Extension
+# CORTEX - A Smart Pomodoro Timer for Chrome
 
-A smart, floating Pomodoro timer that follows you across every website. Perfect for maintaining focus and productivity while browsing.
+CORTEX is a smart, floating Pomodoro timer that follows you across every website, helping you stay focused and productive. It's designed to be unobtrusive yet always accessible, and it occasionally reminds you of your current task just by being present on your screen.
+
+For detailed technical documentation, please see the [`docs`](./docs/README.md) folder.
+
+---
+
+## Features
+
+-   **Floating Timer:** A draggable timer that is present on every webpage you visit.
+-   **Per-Site Position Saving:** CORTEX remembers where you place the timer on different websites.
+-   **Configurable Task Reminders:** Set a frequency for gentle, periodic reminders that play a sound and visually shake the timer to help you stay on task. An indicator shows when reminders are active.
+-   **Dual Modes:** Switch between a countdown **Pomodoro** timer and a count-up **Stopwatch**.
+-   **Persistent & Synced:** Your timer's state is saved and synced across your devices. It will resume right where you left off, even after restarting your browser.
+-   **Task Label:** Set a label for your current task to keep you focused on your goal.
+-   **Configurable Duration:** Easily set the length of your focus intervals.
+-   **Minimizable:** Hide the timer to a small dot on the side of your screen to reduce distractions.
+-   **New Tab Integration:** The timer appears in the center of your "New Tab" page.
+-   **Audio Alerts:** Get notified with a sound when your Pomodoro session is complete.
+
+---
+
+## How to Install and Run It
+
+Since this is an unpacked Chrome extension, you need to load it in Developer Mode.
+
+1.  **Download the code:**
+    -   Clone this repository or download it as a ZIP file and unzip it.
+
+2.  **Open Chrome Extensions:**
+    -   Open Google Chrome.
+    -   Navigate to `chrome://extensions`. You can copy and paste this into your address bar.
+
+3.  **Enable Developer Mode:**
+    -   In the top-right corner of the Extensions page, you'll see a "Developer mode" toggle. Make sure it is switched **on**.
+
+4.  **Load the Extension:**
+    -   You will now see a "Load unpacked" button. Click it.
+    -   A file selection dialog will open. Navigate to the folder where you saved this code and select the `pomodoro timer` directory.
+    -   Click "Select".
+
+5.  **Done!**
+    -   The CORTEX extension should now appear in your list of extensions, and the floating timer will be active on your tabs. You can manage its settings from the timer itself.
 
 ## What Makes This Special
 
@@ -36,66 +77,6 @@ The timer appears as a floating element that you can:
 - **Desktop notifications** when timer completes
 - **Customizable duration** (default: 25 minutes)
 - **Responsive design** that works on any screen size
-
-## Installation Guide (For Non-Developers)
-
-### Step 1: Download the Extension Files
-1. **Download the ZIP file**: Click the green "Code" button on this page, then select "Download ZIP"
-2. **Extract the files**: 
-   - On Windows: Right-click the ZIP file and select "Extract All"
-   - On Mac: Double-click the ZIP file to extract
-   - On Linux: Right-click and select "Extract Here"
-3. **Remember the folder location**: Note where you extracted the files - you'll need this in Step 4
-
-### Step 2: Open Chrome Extensions Page
-1. Open Google Chrome
-2. Type `chrome://extensions/` in the address bar and press Enter
-3. You should see a page with your installed extensions
-
-### Step 3: Enable Developer Mode
-1. Look for the toggle switch labeled "Developer mode" in the top-right corner
-2. Turn it ON (it will turn blue)
-3. You'll see new options appear below
-
-### Step 4: Load the Extension
-1. Click the "Load unpacked" button that appeared after enabling Developer mode
-2. A file browser window will open
-3. Navigate to the folder where you extracted the CORTEX files
-4. Select the folder (not individual files) and click "Select Folder"
-5. You should see CORTEX appear in your extensions list
-
-### Step 5: Verify Installation
-1. Look for CORTEX in your extensions list
-2. Make sure the toggle switch next to it is ON (blue)
-3. Open a new tab - you should see the timer centered on a black background
-4. Visit any website - you should see the floating timer appear
-
-### Troubleshooting
-- **Extension not appearing?** Make sure you selected the folder containing the files, not individual files
-- **Timer not showing?** Try refreshing the page or opening a new tab
-- **Permission errors?** Make sure you enabled Developer mode first
-
-### What You Should See
-- A floating timer on every website you visit
-- The timer can be dragged around and positioned anywhere
-- Hover over the timer to see Start/Pause, Reset, and Set Time buttons
-- New tabs show the timer centered on a black background
-
-## Usage
-
-### Basic Timer
-- **Start/Pause**: Click the Start button to begin your focus session
-- **Reset**: Reset the timer back to the original duration
-- **Set Time**: Change the timer duration to any number of minutes
-
-### Positioning
-- **Drag**: Click and drag the timer to move it around
-- **Auto-save**: Your position is automatically saved for each website
-- **Hover**: Hover over the timer to see the control buttons
-
-### New Tab
-- Open a new tab to see the timer centered on a black background
-- Perfect for starting a focused work session
 
 ## Why Pomodoro?
 

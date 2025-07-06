@@ -3,10 +3,10 @@
   position: fixed;
   top: 20px;
   right: 20px;
-  background: rgba(0, 0, 0, 0.8);
+  background: rgba(0, 0, 0, 0.65);
   color: #4CAF50;
   border-radius: 12px;
-  padding: 20px;
+  padding: 30px 20px 20px 20px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 24px;
   font-weight: bold;
@@ -25,7 +25,7 @@
 }
 
 .pomodoro-timer:hover {
-  background: rgba(0, 0, 0, 0.9);
+  background: rgba(0, 0, 0, 0.8);
   transform: scale(1.05);
 }
 
@@ -37,6 +37,7 @@
   font-family: 'Courier New', monospace;
   letter-spacing: 2px;
   text-shadow: 0 2px 4px rgba(76, 175, 80, 0.3);
+  margin-top: -10px;
 }
 
 .timer-controls {
@@ -49,7 +50,7 @@
 .timer-controls button {
   background: rgba(255, 255, 255, 0.2);
   border: none;
-  color: #4CAF50;
+  color: #ccc;
   padding: 10px 18px;
   border-radius: 8px;
   cursor: pointer;
@@ -62,6 +63,7 @@
 .timer-controls button:hover {
   background: rgba(255, 255, 255, 0.3);
   transform: translateY(-1px);
+  color: #fff;
 }
 
 .timer-controls button:active {
@@ -77,24 +79,85 @@
 
 .task-display {
   color: #ccc;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 500;
   margin-top: 15px;
   padding: 0 5px;
-  max-height: 2.4em; /* Approx 2 lines */
+  max-height: 4.8em; /* Approx 3 lines (1.6em line-height * 3) */
+  max-width: 25ch;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: normal;
   display: -webkit-box;
-  -webkit-line-clamp: 2; /* Limit to 2 lines */
+  -webkit-line-clamp: 3; /* Limit to 3 lines */
   -webkit-box-orient: vertical;
   transition: max-height 0.2s ease;
-  line-height: 1.2em;
+  line-height: 1.6em;
+  text-align: center;
 }
 
 .pomodoro-timer:hover .task-display {
   max-height: 200px; /* Allow full text on hover */
   -webkit-line-clamp: unset;
+}
+
+.task-display.task-glow {
+  animation: glow-animation 0.5s ease-in-out 2; /* Pulse twice */
+  transform-origin: center;
+}
+
+@keyframes glow-animation {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.25); text-shadow: 0 0 20px rgba(204, 204, 204, 0.9); }
+  100% { transform: scale(1); }
+}
+
+.stopwatch-display {
+  color: #a0a0a0;
+  font-size: 14px;
+  font-family: 'Courier New', monospace;
+  margin-top: 10px;
+  display: none; /* Hidden by default */
+  text-align: center;
+}
+
+.close-btn {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  font-size: 24px;
+  color: #888;
+  cursor: pointer;
+  line-height: 1;
+  transition: color 0.2s ease;
+  display: none; /* Hidden by default */
+}
+
+.pomodoro-timer:hover .close-btn {
+    display: block; /* Show on hover */
+}
+
+.close-btn:hover {
+  color: #fff;
+}
+
+.re-enable-dot {
+  position: fixed;
+  top: 50%;
+  right: 10px;
+  width: 15px;
+  height: 15px;
+  background: rgba(76, 175, 80, 0.7);
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 999998;
+  box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+  transition: transform 0.2s ease;
+  transform: translateY(-50%);
+}
+
+.re-enable-dot:hover {
+  transform: scale(1.2) translateY(-50%);
 }
 
 .start-btn {
@@ -104,6 +167,7 @@
 
 .start-btn:hover {
   background: rgba(76, 175, 80, 0.5) !important;
+  color: #fff;
 }
 
 /* Ensure timer stays above everything */
@@ -137,4 +201,90 @@
     padding: 8px 15px;
     font-size: 14px;
   }
+}
+
+.pomodoro-timer.stopwatch-mode .timer-display {
+  color: #64b5f6; /* A blue color for stopwatch */
+}
+
+.pomodoro-timer.stopwatch-mode .start-btn {
+    background: rgba(33, 150, 243, 0.3) !important;
+    border: 1px solid rgba(33, 150, 243, 0.5) !important;
+    color: #64b5f6;
+}
+
+.pomodoro-timer.stopwatch-mode .start-btn:hover {
+    background: rgba(33, 150, 243, 0.5) !important;
+    color: #fff;
+}
+
+#switchModeBtn {
+    font-size: 12px;
+    padding: 8px 10px;
+    line-height: 1.2;
+    min-width: 90px;
+    height: auto;
+}
+
+.freq-controls {
+    display: none; /* Hidden by default */
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.pomodoro-timer:hover .freq-controls {
+    display: flex;
+}
+
+.pomodoro-timer:hover .reminder-indicator {
+    display: none;
+}
+
+.freq-label {
+    font-size: 13px;
+    color: #999;
+}
+
+.arrow-btn {
+    background: transparent;
+    border: 1px solid #666;
+    color: #999;
+    border-radius: 50%;
+    width: 22px;
+    height: 22px;
+    line-height: 20px;
+    text-align: center;
+    cursor: pointer;
+    padding: 0;
+    font-size: 18px;
+    font-weight: bold;
+    transition: all 0.2s ease;
+}
+
+.arrow-btn:hover {
+    background: #888;
+    color: #fff;
+    border-color: #888;
+}
+
+#freq-value {
+    font-size: 14px;
+    color: #ccc;
+    min-width: 40px;
+    text-align: center;
+    font-family: 'Courier New', monospace;
+}
+
+.reminder-indicator {
+    display: none; /* Hidden by default */
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    width: 8px;
+    height: 8px;
+    background-color: #4CAF50;
+    border-radius: 50%;
+    box-shadow: 0 0 8px #4CAF50;
 }

@@ -1,14 +1,15 @@
 // Pomodoro Timer Content Script - Display Layer Only
 let timerElement = null;
+let reEnableDot = null;
 let isDragging = false;
 let dragOffset = { x: 0, y: 0 };
-let currentPosition = { x: 20, y: 20 }; // Default position
+let currentPosition = null; // Set to null initially
 const currentDomain = window.location.hostname;
 
 // Initialize timer
 function init() {
-  loadPosition();
-  createTimerElement();
+  createTimerElement(); // Create it first
+  loadPosition();       // Then load and apply the correct position
   requestTimerState();
 }
 
@@ -17,6 +18,17 @@ function loadPosition() {
   chrome.storage.sync.get([`position_${currentDomain}`], function(result) {
     if (result[`position_${currentDomain}`]) {
       currentPosition = result[`position_${currentDomain}`];
+    } else {
+      // Set default position to the middle of the right side of the screen
+      currentPosition = { x: 20, y: window.innerHeight / 2 };
+    }
+    
+    // Apply the position
+    if (timerElement) {
+        // Adjust for element height to truly center it
+        const rect = timerElement.getBoundingClientRect();
+        timerElement.style.top = (currentPosition.y - (rect.height / 2)) + 'px';
+        timerElement.style.right = currentPosition.x + 'px';
     }
   });
 }
@@ -32,12 +44,20 @@ function savePosition() {
 function requestTimerState() {
   chrome.runtime.sendMessage({action: 'getTimerState'}, function(response) {
     if (response && timerElement) {
-      updateDisplay(response.timeLeft);
+      updateDisplay(response.timeLeft, response.mode);
       updateStartButton(response.isRunning);
-      updateTaskDisplay(response.currentTask, response.isRunning);
+      updateTaskDisplay(response.currentTask, response.isRunning, response.mode);
+      updateStopwatchDisplay(response.stopwatch);
+      updateFrequencyControls(response.reminderFrequency, response.currentTask);
       
       // Show/hide timer based on enabled state
-      timerElement.style.display = response.enabled ? 'block' : 'none';
+      if (response.enabled) {
+        timerElement.style.display = 'block';
+        reEnableDot.style.display = 'none';
+      } else {
+        timerElement.style.display = 'none';
+        reEnableDot.style.display = 'block';
+      }
     }
   });
 }
@@ -49,8 +69,6 @@ function createTimerElement() {
   timerElement = document.createElement('div');
   timerElement.id = 'pomodoro-timer';
   timerElement.className = 'pomodoro-timer';
-  timerElement.style.top = currentPosition.y + 'px';
-  timerElement.style.right = currentPosition.x + 'px';
   
   // Create timer display
   const display = document.createElement('div');
@@ -64,25 +82,36 @@ function createTimerElement() {
   const startBtn = document.createElement('button');
   startBtn.className = 'start-btn';
   startBtn.textContent = 'Start';
+  startBtn.title = 'Start/Pause Timer';
   startBtn.onclick = toggleTimer;
   
   const resetBtn = document.createElement('button');
   resetBtn.textContent = 'Reset';
+  resetBtn.title = 'Reset Timer';
   resetBtn.onclick = resetTimer;
   
   const settingsBtn = document.createElement('button');
   settingsBtn.textContent = 'Set';
+  settingsBtn.title = 'Set Duration';
   settingsBtn.onclick = showSettings;
 
   const taskBtn = document.createElement('button');
   taskBtn.textContent = 'Task';
   taskBtn.id = 'taskBtn';
+  taskBtn.title = 'Set Current Task';
   taskBtn.onclick = showTaskPrompt;
+
+  const switchModeBtn = document.createElement('button');
+  switchModeBtn.id = 'switchModeBtn';
+  switchModeBtn.onclick = () => {
+    chrome.runtime.sendMessage({ action: 'switchMode' });
+  };
   
   controls.appendChild(startBtn);
   controls.appendChild(resetBtn);
   controls.appendChild(settingsBtn);
   controls.appendChild(taskBtn);
+  controls.appendChild(switchModeBtn);
   
   timerElement.appendChild(display);
   timerElement.appendChild(controls);
@@ -92,8 +121,44 @@ function createTimerElement() {
   taskDisplay.className = 'task-display';
   timerElement.appendChild(taskDisplay);
   
+  // Create stopwatch display
+  const stopwatchDisplay = document.createElement('div');
+  stopwatchDisplay.className = 'stopwatch-display';
+  timerElement.appendChild(stopwatchDisplay);
+  
+  // Create frequency controls
+  const freqControls = document.createElement('div');
+  freqControls.className = 'freq-controls';
+  freqControls.innerHTML = `
+    <span class="freq-label">Reminder:</span>
+    <button class="arrow-btn" id="freq-down" title="Less Frequent">&minus;</button>
+    <span id="freq-value">2 min</span>
+    <button class="arrow-btn" id="freq-up" title="More Frequent">&plus;</button>
+  `;
+  timerElement.appendChild(freqControls);
+  
+  // Add reminder indicator dot
+  const reminderIndicator = document.createElement('div');
+  reminderIndicator.className = 'reminder-indicator';
+  reminderIndicator.title = 'Reminders are active';
+  timerElement.appendChild(reminderIndicator);
+  
+  // Add close button
+  const closeBtn = document.createElement('div');
+  closeBtn.className = 'close-btn';
+  closeBtn.innerHTML = '&times;';
+  closeBtn.title = 'Minimize Timer';
+  closeBtn.onclick = () => {
+    chrome.runtime.sendMessage({ action: 'toggleEnabled', enabled: false });
+  };
+  timerElement.appendChild(closeBtn);
+  
   // Make draggable
   setupDragging();
+  
+  // Add event listeners for frequency controls
+  timerElement.querySelector('#freq-down').addEventListener('click', () => adjustFrequency(-1));
+  timerElement.querySelector('#freq-up').addEventListener('click', () => adjustFrequency(1));
   
   // Show controls on hover
   timerElement.onmouseenter = () => {
@@ -109,6 +174,23 @@ function createTimerElement() {
   };
   
   document.body.appendChild(timerElement);
+  createReEnableDot();
+}
+
+// Create the dot to re-enable the timer
+function createReEnableDot() {
+  if (reEnableDot) return;
+  reEnableDot = document.createElement('div');
+  reEnableDot.className = 're-enable-dot';
+  reEnableDot.title = 'Show Timer';
+  reEnableDot.style.display = 'none'; // Hidden by default
+  
+  reEnableDot.onclick = () => {
+    chrome.runtime.sendMessage({ action: 'toggleEnabled', enabled: true });
+  };
+
+  document.body.appendChild(reEnableDot);
+  setupDotDragging(reEnableDot);
 }
 
 // Setup dragging functionality
@@ -165,6 +247,32 @@ function stopDrag() {
   savePosition();
 }
 
+function setupDotDragging(dot) {
+    let isDotDragging = false;
+    let dotDragOffset = { y: 0 };
+
+    dot.addEventListener('mousedown', (e) => {
+        isDotDragging = true;
+        dot.style.cursor = 'grabbing';
+        dotDragOffset.y = e.clientY - dot.getBoundingClientRect().top;
+        e.stopPropagation();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!isDotDragging) return;
+        let newY = e.clientY - dotDragOffset.y;
+        const maxY = window.innerHeight - dot.offsetHeight;
+        newY = Math.max(0, Math.min(newY, maxY));
+        dot.style.top = newY + 'px';
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (!isDotDragging) return;
+        isDotDragging = false;
+        dot.style.cursor = 'pointer';
+    });
+}
+
 // Format time as MM:SS
 function formatTime(seconds) {
   const minutes = Math.floor(seconds / 60);
@@ -189,10 +297,26 @@ function resetTimer() {
 }
 
 // Update timer display
-function updateDisplay(timeLeft) {
+function updateDisplay(timeLeft, mode) {
   if (!timerElement) return;
   const display = timerElement.querySelector('.timer-display');
+  const switchModeBtn = timerElement.querySelector('#switchModeBtn');
+
   display.textContent = formatTime(timeLeft);
+
+  if (mode === 'stopwatch') {
+      timerElement.classList.add('stopwatch-mode');
+      if(switchModeBtn) {
+          switchModeBtn.textContent = 'To Timer';
+          switchModeBtn.title = 'Switch to Timer';
+      }
+  } else {
+      timerElement.classList.remove('stopwatch-mode');
+      if(switchModeBtn) {
+          switchModeBtn.textContent = 'To Stopwatch';
+          switchModeBtn.title = 'Switch to Stopwatch';
+      }
+  }
 }
 
 // Update start button text
@@ -202,17 +326,54 @@ function updateStartButton(isRunning) {
   startBtn.textContent = isRunning ? 'Pause' : 'Start';
 }
 
+// Update stopwatch display
+function updateStopwatchDisplay(stopwatch) {
+    if (!timerElement) return;
+    const stopwatchDisplay = timerElement.querySelector('.stopwatch-display');
+    if (stopwatch && stopwatch.isRunning) {
+        stopwatchDisplay.textContent = '⏱️ ' + formatTime(stopwatch.time);
+        stopwatchDisplay.style.display = 'block';
+    } else {
+        stopwatchDisplay.style.display = 'none';
+    }
+}
+
+// Update frequency controls
+function updateFrequencyControls(frequency, task) {
+  if (!timerElement) return;
+  const freqControls = timerElement.querySelector('.freq-controls');
+  const freqValue = timerElement.querySelector('#freq-value');
+  const reminderIndicator = timerElement.querySelector('.reminder-indicator');
+
+  if (task) {
+    freqValue.textContent = `${frequency} min`;
+    if (frequency > 0) {
+        reminderIndicator.style.display = 'block';
+    } else {
+        reminderIndicator.style.display = 'none';
+    }
+  } else {
+    freqControls.style.display = 'none';
+    reminderIndicator.style.display = 'none';
+  }
+}
+
 // Update task display
-function updateTaskDisplay(task, isRunning) {
+function updateTaskDisplay(task, isRunning, mode) {
   if (!timerElement) return;
   const taskDisplay = timerElement.querySelector('.task-display');
   const taskBtn = timerElement.querySelector('#taskBtn');
+  const settingsBtn = timerElement.querySelector('[title="Set Duration"]');
 
   if (task) {
     taskDisplay.textContent = task;
     taskDisplay.style.display = 'block';
   } else {
     taskDisplay.style.display = 'none';
+  }
+  
+  if(settingsBtn) {
+    settingsBtn.style.display = mode === 'pomodoro' ? 'inline-block' : 'none';
   }
 
   if (taskBtn) {
@@ -254,21 +415,55 @@ function showTaskPrompt() {
   });
 }
 
+function adjustFrequency(change) {
+    chrome.runtime.sendMessage({action: 'getTimerState'}, function(response) {
+        if (response) {
+            let newFreq = response.reminderFrequency + change;
+            if (newFreq < 0) newFreq = 0; // Minimum 0 minutes
+            if (newFreq > 60) newFreq = 60; // Maximum 60 minutes
+            chrome.runtime.sendMessage({ action: 'updateReminderFrequency', frequency: newFreq });
+        }
+    });
+}
+
 // Listen for messages from background script
 chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
   switch(request.action) {
     case 'updateTimerDisplay':
-      updateDisplay(request.timeLeft);
+      updateDisplay(request.timeLeft, request.mode);
       updateStartButton(request.isRunning);
-      updateTaskDisplay(request.currentTask, request.isRunning);
+      updateTaskDisplay(request.currentTask, request.isRunning, request.mode);
+      updateStopwatchDisplay(request.stopwatch);
+      updateFrequencyControls(request.reminderFrequency, request.currentTask);
       
       // Show/hide timer based on enabled state
-      if (timerElement) {
-        timerElement.style.display = request.enabled ? 'block' : 'none';
+      if (timerElement && reEnableDot) {
+        if (request.enabled) {
+          timerElement.style.display = 'block';
+          reEnableDot.style.display = 'none';
+        } else {
+          timerElement.style.display = 'none';
+          reEnableDot.style.display = 'block';
+        }
       }
       break;
       
+    case 'remindTask':
+      if (timerElement) {
+        const taskDisplay = timerElement.querySelector('.task-display');
+        if (taskDisplay && taskDisplay.textContent) {
+          playReminderSound();
+          taskDisplay.classList.add('task-glow');
+          setTimeout(() => {
+            taskDisplay.classList.remove('task-glow');
+          }, 2000); // Glow for 2 seconds
+        }
+      }
+      break;
+
     case 'timerComplete':
+      // Play a sound
+      playSound();
       // Timer completed notification - only request permission when needed
       if (Notification.permission === 'default') {
         Notification.requestPermission().then(permission => {
@@ -288,6 +483,43 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
       break;
   }
 });
+
+// Function to play a sound without audio files
+function playSound() {
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const oscillator = audioCtx.createOscillator();
+  const gainNode = audioCtx.createGain();
+
+  oscillator.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+
+  // Sound characteristics
+  oscillator.type = 'sine'; // 'sine', 'square', 'sawtooth', 'triangle'
+  oscillator.frequency.setValueAtTime(440, audioCtx.currentTime); // A4 note
+  gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
+
+  // Play and stop the sound
+  oscillator.start(audioCtx.currentTime);
+  oscillator.stop(audioCtx.currentTime + 0.5); // Play for 0.5 seconds
+}
+
+function playReminderSound() {
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const oscillator = audioCtx.createOscillator();
+  const gainNode = audioCtx.createGain();
+
+  oscillator.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+
+  // Sound characteristics - softer and shorter
+  oscillator.type = 'sine';
+  oscillator.frequency.setValueAtTime(300, audioCtx.currentTime);
+  gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime); // Very low volume
+
+  // Play and stop the sound
+  oscillator.start(audioCtx.currentTime);
+  oscillator.stop(audioCtx.currentTime + 0.15); // Play for 0.15 seconds
+}
 
 // Initialize when DOM is ready
 if (document.readyState === 'loading') {

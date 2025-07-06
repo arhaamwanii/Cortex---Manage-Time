@@ -6,129 +6,54 @@
     <title>CORTEX Timer</title>
     <style>
         body {
-            width: 200px;
-            height: 120px;
-            padding: 0;
+            width: 250px;
+            height: 150px;
+            padding: 20px;
             margin: 0;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: #000000;
-            color: #4CAF50;
+            color: #ccc;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 20px;
+            text-align: center;
         }
         
         .title {
             font-size: 18px;
             font-weight: 600;
+            color: #4CAF50;
+            margin: 0 0 15px 0;
+        }
+
+        p {
+            font-size: 14px;
+            line-height: 1.5;
             margin: 0;
         }
-        
-        .toggle-container {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-        
-        .toggle-switch {
-            position: relative;
-            width: 60px;
-            height: 30px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 15px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            border: 1px solid rgba(76, 175, 80, 0.3);
-        }
-        
-        .toggle-switch.active {
-            background: rgba(76, 175, 80, 0.3);
-            border-color: rgba(76, 175, 80, 0.6);
-        }
-        
-        .toggle-slider {
-            position: absolute;
-            top: 2px;
-            left: 2px;
-            width: 24px;
-            height: 24px;
-            background: #4CAF50;
-            border-radius: 50%;
-            transition: all 0.3s ease;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-        }
-        
-        .toggle-switch.active .toggle-slider {
-            transform: translateX(30px);
-        }
-        
-        .status-text {
-            font-size: 14px;
-            font-weight: 500;
-            min-width: 40px;
-        }
-        
-        .status-text.enabled {
+
+        a {
             color: #4CAF50;
+            text-decoration: none;
         }
-        
-        .status-text.disabled {
-            color: rgba(255, 255, 255, 0.5);
+
+        a:hover {
+            text-decoration: underline;
         }
     </style>
 </head>
 <body>
-    <h1 class="title">🧠 CORTEX</h1>
-    
-    <div class="toggle-container">
-        <span class="status-text" id="statusText">OFF</span>
-        <div class="toggle-switch" id="toggleSwitch">
-            <div class="toggle-slider"></div>
-        </div>
-    </div>
-
+    <h1 class="title">CORTEX</h1>
+    <p>All controls are on the draggable timer on your screen. To disable the extension, visit <a id="extensionsLink" href="chrome://extensions" target="_blank">chrome://extensions</a>.</p>
     <script>
-        let isEnabled = true; // Default state
-        
-        // Load current enabled state
-        chrome.runtime.sendMessage({action: 'getEnabled'}, function(response) {
-            if (response !== undefined) {
-                isEnabled = response.enabled;
-                updateUI();
-            }
-        });
-        
-        function updateUI() {
-            const toggleSwitch = document.getElementById('toggleSwitch');
-            const statusText = document.getElementById('statusText');
-            
-            if (isEnabled) {
-                toggleSwitch.classList.add('active');
-                statusText.textContent = 'ON';
-                statusText.className = 'status-text enabled';
-            } else {
-                toggleSwitch.classList.remove('active');
-                statusText.textContent = 'OFF';
-                statusText.className = 'status-text disabled';
-            }
+        const isBrave = navigator.userAgent.includes('Brave');
+        const extensionsUrl = isBrave ? 'brave://extensions' : 'chrome://extensions';
+        const link = document.getElementById('extensionsLink');
+        if (link) {
+            link.href = extensionsUrl;
+            link.textContent = extensionsUrl;
         }
-        
-        // Toggle functionality
-        document.getElementById('toggleSwitch').addEventListener('click', function() {
-            isEnabled = !isEnabled;
-            updateUI();
-            
-            // Send toggle message to background script
-            chrome.runtime.sendMessage({
-                action: 'toggleEnabled',
-                enabled: isEnabled
-            });
-        });
-        
-        // Initialize UI
-        updateUI();
     </script>
 </body>
 </html>
