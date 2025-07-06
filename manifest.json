@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "Floating Pomodoro Timer",
+  "version": "1.0",
+  "description": "A simple floating Pomodoro timer that appears in the corner of every website",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "tabs"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "css": ["timer.css"],
+      "run_at": "document_end"
+    }
+  ],
+  "chrome_url_overrides": {
+    "newtab": "newtab.html"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Pomodoro Timer Settings"
+  }
+}
