@@ -3,164 +3,132 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pomodoro Timer Settings</title>
+    <title>CORTEX Timer</title>
     <style>
         body {
-            width: 300px;
-            padding: 20px;
+            width: 200px;
+            height: 120px;
+            padding: 0;
+            margin: 0;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            background: #000000;
+            color: #4CAF50;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+        }
+        
+        .title {
+            font-size: 18px;
+            font-weight: 600;
             margin: 0;
         }
         
-        .container {
-            text-align: center;
-        }
-        
-        h1 {
-            margin: 0 0 20px 0;
-            font-size: 24px;
-            font-weight: 600;
-        }
-        
-        .setting-group {
-            margin-bottom: 15px;
-            text-align: left;
-        }
-        
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: 500;
-        }
-        
-        input[type="number"] {
-            width: 100%;
-            padding: 10px;
-            border: none;
-            border-radius: 6px;
-            font-size: 16px;
-            background: rgba(255, 255, 255, 0.9);
-            color: #333;
-            box-sizing: border-box;
-        }
-        
-        .btn-group {
+        .toggle-container {
             display: flex;
-            gap: 10px;
-            margin-top: 20px;
+            align-items: center;
+            gap: 15px;
         }
         
-        button {
-            flex: 1;
-            padding: 12px;
-            border: none;
-            border-radius: 6px;
+        .toggle-switch {
+            position: relative;
+            width: 60px;
+            height: 30px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(76, 175, 80, 0.3);
+        }
+        
+        .toggle-switch.active {
+            background: rgba(76, 175, 80, 0.3);
+            border-color: rgba(76, 175, 80, 0.6);
+        }
+        
+        .toggle-slider {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 24px;
+            height: 24px;
+            background: #4CAF50;
+            border-radius: 50%;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        
+        .toggle-switch.active .toggle-slider {
+            transform: translateX(30px);
+        }
+        
+        .status-text {
             font-size: 14px;
             font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s ease;
+            min-width: 40px;
         }
         
-        .btn-primary {
-            background: #4CAF50;
-            color: white;
+        .status-text.enabled {
+            color: #4CAF50;
         }
         
-        .btn-primary:hover {
-            background: #45a049;
-        }
-        
-        .btn-secondary {
-            background: rgba(255, 255, 255, 0.2);
-            color: white;
-        }
-        
-        .btn-secondary:hover {
-            background: rgba(255, 255, 255, 0.3);
-        }
-        
-        .info {
-            margin-top: 15px;
-            padding: 10px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 6px;
-            font-size: 12px;
-            line-height: 1.4;
+        .status-text.disabled {
+            color: rgba(255, 255, 255, 0.5);
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🍅 Pomodoro Timer</h1>
-        
-        <div class="setting-group">
-            <label for="timerDuration">Timer Duration (minutes):</label>
-            <input type="number" id="timerDuration" min="1" max="180" value="25">
-        </div>
-        
-        <div class="btn-group">
-            <button class="btn-primary" id="saveSettings">Save</button>
-            <button class="btn-secondary" id="resetDefault">Reset to 25min</button>
-        </div>
-        
-        <div class="info">
-            <strong>How to use:</strong><br>
-            • Timer appears in the corner of every website<br>
-            • <strong>DRAG to move</strong> - position saved per website<br>
-            • Timer is <strong>synchronized across all tabs</strong><br>
-            • Hover over timer to see controls<br>
-            • Click "Start" to begin, "Pause" to stop<br>
-            • Use "Set" button on timer or this popup to change duration
+    <h1 class="title">🧠 CORTEX</h1>
+    
+    <div class="toggle-container">
+        <span class="status-text" id="statusText">OFF</span>
+        <div class="toggle-switch" id="toggleSwitch">
+            <div class="toggle-slider"></div>
         </div>
     </div>
 
     <script>
-        // Load current settings
-        chrome.storage.sync.get(['timerDuration'], function(result) {
-            if (result.timerDuration) {
-                document.getElementById('timerDuration').value = result.timerDuration;
+        let isEnabled = true; // Default state
+        
+        // Load current enabled state
+        chrome.runtime.sendMessage({action: 'getEnabled'}, function(response) {
+            if (response !== undefined) {
+                isEnabled = response.enabled;
+                updateUI();
             }
         });
-
-        // Save settings
-        document.getElementById('saveSettings').addEventListener('click', function() {
-            const duration = parseInt(document.getElementById('timerDuration').value);
-            if (duration > 0) {
-                chrome.storage.sync.set({
-                    timerDuration: duration
-                }, function() {
-                    // Send message to background script to update timer globally
-                    chrome.runtime.sendMessage({
-                        action: 'updateDuration',
-                        duration: duration
-                    });
-                    
-                    // Show success feedback
-                    const btn = document.getElementById('saveSettings');
-                    btn.textContent = 'Saved!';
-                    btn.style.background = '#2196F3';
-                    setTimeout(() => {
-                        btn.textContent = 'Save';
-                        btn.style.background = '#4CAF50';
-                    }, 1000);
-                });
+        
+        function updateUI() {
+            const toggleSwitch = document.getElementById('toggleSwitch');
+            const statusText = document.getElementById('statusText');
+            
+            if (isEnabled) {
+                toggleSwitch.classList.add('active');
+                statusText.textContent = 'ON';
+                statusText.className = 'status-text enabled';
+            } else {
+                toggleSwitch.classList.remove('active');
+                statusText.textContent = 'OFF';
+                statusText.className = 'status-text disabled';
             }
-        });
-
-        // Reset to default
-        document.getElementById('resetDefault').addEventListener('click', function() {
-            document.getElementById('timerDuration').value = 25;
-            chrome.storage.sync.set({
-                timerDuration: 25
-            }, function() {
-                chrome.runtime.sendMessage({
-                    action: 'updateDuration',
-                    duration: 25
-                });
+        }
+        
+        // Toggle functionality
+        document.getElementById('toggleSwitch').addEventListener('click', function() {
+            isEnabled = !isEnabled;
+            updateUI();
+            
+            // Send toggle message to background script
+            chrome.runtime.sendMessage({
+                action: 'toggleEnabled',
+                enabled: isEnabled
             });
         });
+        
+        // Initialize UI
+        updateUI();
     </script>
 </body>
 </html>

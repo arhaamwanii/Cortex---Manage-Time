@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Floating Pomodoro Timer",
+  "name": "CORTEX - Smart Pomodoro Timer",
   "version": "1.0",
-  "description": "A simple floating Pomodoro timer that appears in the corner of every website",
+  "description": "CORTEX: A smart, floating Pomodoro timer that follows you across every website for focused productivity",
   "permissions": [
     "activeTab",
     "storage",
@@ -24,6 +24,6 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Pomodoro Timer Settings"
+    "default_title": "CORTEX Timer Controls"
   }
 }

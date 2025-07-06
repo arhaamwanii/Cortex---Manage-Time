@@ -69,6 +69,34 @@
   transform: translateY(0);
 }
 
+.timer-controls button:disabled {
+  background: rgba(255, 255, 255, 0.1);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.task-display {
+  color: #ccc;
+  font-size: 14px;
+  font-weight: 500;
+  margin-top: 15px;
+  padding: 0 5px;
+  max-height: 2.4em; /* Approx 2 lines */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2; /* Limit to 2 lines */
+  -webkit-box-orient: vertical;
+  transition: max-height 0.2s ease;
+  line-height: 1.2em;
+}
+
+.pomodoro-timer:hover .task-display {
+  max-height: 200px; /* Allow full text on hover */
+  -webkit-line-clamp: unset;
+}
+
 .start-btn {
   background: rgba(76, 175, 80, 0.3) !important;
   border: 1px solid rgba(76, 175, 80, 0.5) !important;

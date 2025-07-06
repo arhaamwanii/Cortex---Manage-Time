@@ -1,7 +1,5 @@
-// Pomodoro Timer Content Script
+// Pomodoro Timer Content Script - Display Layer Only
 let timerElement = null;
-let isRunning = false;
-let timeLeft = 25 * 60;
 let isDragging = false;
 let dragOffset = { x: 0, y: 0 };
 let currentPosition = { x: 20, y: 20 }; // Default position
@@ -33,11 +31,13 @@ function savePosition() {
 // Request timer state from background
 function requestTimerState() {
   chrome.runtime.sendMessage({action: 'getTimerState'}, function(response) {
-    if (response) {
-      timeLeft = response.timeLeft;
-      isRunning = response.isRunning;
-      updateDisplay();
-      updateStartButton();
+    if (response && timerElement) {
+      updateDisplay(response.timeLeft);
+      updateStartButton(response.isRunning);
+      updateTaskDisplay(response.currentTask, response.isRunning);
+      
+      // Show/hide timer based on enabled state
+      timerElement.style.display = response.enabled ? 'block' : 'none';
     }
   });
 }
@@ -55,7 +55,7 @@ function createTimerElement() {
   // Create timer display
   const display = document.createElement('div');
   display.className = 'timer-display';
-  display.textContent = formatTime(timeLeft);
+  display.textContent = '25:00'; // Will be updated by background script
   
   // Create controls (hidden by default)
   const controls = document.createElement('div');
@@ -73,13 +73,24 @@ function createTimerElement() {
   const settingsBtn = document.createElement('button');
   settingsBtn.textContent = 'Set';
   settingsBtn.onclick = showSettings;
+
+  const taskBtn = document.createElement('button');
+  taskBtn.textContent = 'Task';
+  taskBtn.id = 'taskBtn';
+  taskBtn.onclick = showTaskPrompt;
   
   controls.appendChild(startBtn);
   controls.appendChild(resetBtn);
   controls.appendChild(settingsBtn);
+  controls.appendChild(taskBtn);
   
   timerElement.appendChild(display);
   timerElement.appendChild(controls);
+  
+  // Create task display
+  const taskDisplay = document.createElement('div');
+  taskDisplay.className = 'task-display';
+  timerElement.appendChild(taskDisplay);
   
   // Make draggable
   setupDragging();
@@ -163,11 +174,13 @@ function formatTime(seconds) {
 
 // Toggle timer start/stop
 function toggleTimer() {
-  if (isRunning) {
-    chrome.runtime.sendMessage({action: 'stopTimer'});
-  } else {
-    chrome.runtime.sendMessage({action: 'startTimer'});
-  }
+  chrome.runtime.sendMessage({action: 'getTimerState'}, function(response) {
+    if (response.isRunning) {
+      chrome.runtime.sendMessage({action: 'stopTimer'});
+    } else {
+      chrome.runtime.sendMessage({action: 'startTimer'});
+    }
+  });
 }
 
 // Reset timer
@@ -176,56 +189,102 @@ function resetTimer() {
 }
 
 // Update timer display
-function updateDisplay() {
+function updateDisplay(timeLeft) {
   if (!timerElement) return;
   const display = timerElement.querySelector('.timer-display');
   display.textContent = formatTime(timeLeft);
 }
 
 // Update start button text
-function updateStartButton() {
+function updateStartButton(isRunning) {
   if (!timerElement) return;
   const startBtn = timerElement.querySelector('.start-btn');
   startBtn.textContent = isRunning ? 'Pause' : 'Start';
 }
 
+// Update task display
+function updateTaskDisplay(task, isRunning) {
+  if (!timerElement) return;
+  const taskDisplay = timerElement.querySelector('.task-display');
+  const taskBtn = timerElement.querySelector('#taskBtn');
+
+  if (task) {
+    taskDisplay.textContent = task;
+    taskDisplay.style.display = 'block';
+  } else {
+    taskDisplay.style.display = 'none';
+  }
+
+  if (taskBtn) {
+    taskBtn.disabled = isRunning;
+    if(isRunning) {
+        taskBtn.style.opacity = '0.5';
+        taskBtn.style.cursor = 'not-allowed';
+    } else {
+        taskBtn.style.opacity = '1';
+        taskBtn.style.cursor = 'pointer';
+    }
+  }
+}
+
 // Show settings prompt
 function showSettings() {
-  const minutes = prompt('Set timer duration (minutes):', Math.floor(timeLeft / 60));
-  if (minutes && !isNaN(minutes) && minutes > 0) {
-    chrome.runtime.sendMessage({
-      action: 'updateDuration',
-      duration: parseInt(minutes)
-    });
-  }
+  chrome.runtime.sendMessage({action: 'getTimerState'}, function(response) {
+    const currentMinutes = Math.floor(response.timeLeft / 60);
+    const minutes = prompt('Set timer duration (minutes):', currentMinutes);
+    if (minutes && !isNaN(minutes) && minutes > 0) {
+      chrome.runtime.sendMessage({
+        action: 'updateDuration',
+        duration: parseInt(minutes)
+      });
+    }
+  });
+}
+
+function showTaskPrompt() {
+  chrome.runtime.sendMessage({action: 'getTimerState'}, function(response) {
+      if (response && !response.isRunning) {
+          const task = prompt('What are you working on?', response.currentTask || '');
+          if (task !== null) { 
+              chrome.runtime.sendMessage({action: 'setTask', task: task});
+          }
+      } else {
+          alert('You cannot change the task while the timer is running.');
+      }
+  });
 }
 
 // Listen for messages from background script
 chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
   switch(request.action) {
     case 'updateTimerDisplay':
-      timeLeft = request.timeLeft;
-      isRunning = request.isRunning;
-      updateDisplay();
-      updateStartButton();
-      break;
+      updateDisplay(request.timeLeft);
+      updateStartButton(request.isRunning);
+      updateTaskDisplay(request.currentTask, request.isRunning);
       
-    case 'timerComplete':
-      // Timer completed notification
-      if (Notification.permission === 'granted') {
-        new Notification('Pomodoro Timer', {
-          body: 'Time is up!',
-          icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="%23ff4444"/></svg>'
-        });
+      // Show/hide timer based on enabled state
+      if (timerElement) {
+        timerElement.style.display = request.enabled ? 'block' : 'none';
       }
       break;
       
-    case 'updateTimer':
-      // From popup
-      chrome.runtime.sendMessage({
-        action: 'updateDuration',
-        duration: request.duration
-      });
+    case 'timerComplete':
+      // Timer completed notification - only request permission when needed
+      if (Notification.permission === 'default') {
+        Notification.requestPermission().then(permission => {
+          if (permission === 'granted') {
+            new Notification('CORTEX Timer', {
+              body: 'Time is up! Take a break.',
+              icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="%234CAF50"/></svg>'
+            });
+          }
+        });
+      } else if (Notification.permission === 'granted') {
+        new Notification('CORTEX Timer', {
+          body: 'Time is up! Take a break.',
+          icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="%234CAF50"/></svg>'
+        });
+      }
       break;
   }
 });

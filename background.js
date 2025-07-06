@@ -3,21 +3,27 @@ let globalTimer = {
   timeLeft: 25 * 60,
   isRunning: false,
   defaultTime: 25 * 60,
-  interval: null
+  interval: null,
+  enabled: true,
+  currentTask: ''
 };
 
 // Initialize timer from storage
-chrome.storage.sync.get(['timerState', 'timerDuration'], function(result) {
+chrome.storage.sync.get(['timerState', 'timerDuration', 'timerEnabled'], function(result) {
   if (result.timerDuration) {
     globalTimer.defaultTime = result.timerDuration * 60;
+  }
+  if (result.timerEnabled !== undefined) {
+    globalTimer.enabled = result.timerEnabled;
   }
   if (result.timerState) {
     globalTimer.timeLeft = result.timerState.timeLeft;
     globalTimer.isRunning = result.timerState.isRunning;
     globalTimer.defaultTime = result.timerState.defaultTime;
+    globalTimer.currentTask = result.timerState.currentTask || '';
     
-    // Resume timer if it was running
-    if (globalTimer.isRunning) {
+    // Resume timer if it was running and enabled
+    if (globalTimer.isRunning && globalTimer.enabled) {
       startGlobalTimer();
     }
   } else {
@@ -67,6 +73,7 @@ function stopGlobalTimer() {
 function resetGlobalTimer() {
   stopGlobalTimer();
   globalTimer.timeLeft = globalTimer.defaultTime;
+  globalTimer.currentTask = '';
   broadcastTimerUpdate();
   saveTimerState();
 }
@@ -78,7 +85,9 @@ function broadcastTimerUpdate() {
       chrome.tabs.sendMessage(tab.id, {
         action: 'updateTimerDisplay',
         timeLeft: globalTimer.timeLeft,
-        isRunning: globalTimer.isRunning
+        isRunning: globalTimer.isRunning,
+        enabled: globalTimer.enabled,
+        currentTask: globalTimer.currentTask
       }).catch(() => {}); // Ignore errors for inactive tabs
     });
   });
@@ -90,8 +99,10 @@ function saveTimerState() {
     timerState: {
       timeLeft: globalTimer.timeLeft,
       isRunning: globalTimer.isRunning,
-      defaultTime: globalTimer.defaultTime
-    }
+      defaultTime: globalTimer.defaultTime,
+      currentTask: globalTimer.currentTask
+    },
+    timerEnabled: globalTimer.enabled
   });
 }
 
@@ -102,13 +113,17 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
       sendResponse({
         timeLeft: globalTimer.timeLeft,
         isRunning: globalTimer.isRunning,
-        defaultTime: globalTimer.defaultTime
+        defaultTime: globalTimer.defaultTime,
+        enabled: globalTimer.enabled,
+        currentTask: globalTimer.currentTask
       });
       break;
       
     case 'startTimer':
-      startGlobalTimer();
-      broadcastTimerUpdate();
+      if (globalTimer.enabled) {
+        startGlobalTimer();
+        broadcastTimerUpdate();
+      }
       break;
       
     case 'stopTimer':
@@ -123,6 +138,24 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
     case 'updateDuration':
       globalTimer.defaultTime = request.duration * 60;
       resetGlobalTimer();
+      break;
+      
+    case 'setTask':
+      if (!globalTimer.isRunning) {
+        globalTimer.currentTask = request.task;
+        saveTimerState();
+        broadcastTimerUpdate();
+      }
+      break;
+      
+    case 'toggleEnabled':
+      globalTimer.enabled = request.enabled;
+      saveTimerState();
+      broadcastTimerUpdate();
+      break;
+      
+    case 'getEnabled':
+      sendResponse({ enabled: globalTimer.enabled });
       break;
   }
 });
