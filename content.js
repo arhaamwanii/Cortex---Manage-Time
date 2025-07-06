@@ -48,7 +48,7 @@ function requestTimerState() {
       updateStartButton(response.isRunning);
       updateTaskDisplay(response.currentTask, response.isRunning, response.mode);
       updateStopwatchDisplay(response.stopwatch);
-      updateFrequencyControls(response.reminderFrequency, response.currentTask);
+      updateFrequencyControls(response.reminderFrequency, response.currentTask, response.customReminderSound);
       
       // Show/hide timer based on enabled state
       if (response.enabled) {
@@ -134,6 +134,17 @@ function createTimerElement() {
     <button class="arrow-btn" id="freq-down" title="Less Frequent">&minus;</button>
     <span id="freq-value">2 min</span>
     <button class="arrow-btn" id="freq-up" title="More Frequent">&plus;</button>
+    <div class="sound-controls">
+      <button class="sound-btn" id="sound-upload" title="Upload Custom Sound">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      </button>
+      <div class="sound-status">
+        <span class="file-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+        </span>
+        <button class="remove-sound-btn" title="Remove Custom Sound">&times;</button>
+      </div>
+    </div>
   `;
   timerElement.appendChild(freqControls);
   
@@ -159,6 +170,10 @@ function createTimerElement() {
   // Add event listeners for frequency controls
   timerElement.querySelector('#freq-down').addEventListener('click', () => adjustFrequency(-1));
   timerElement.querySelector('#freq-up').addEventListener('click', () => adjustFrequency(1));
+  timerElement.querySelector('#sound-upload').addEventListener('click', () => openSoundUpload());
+  timerElement.querySelector('.remove-sound-btn').addEventListener('click', () => {
+    chrome.runtime.sendMessage({ action: 'removeCustomSound' });
+  });
   
   // Show controls on hover
   timerElement.onmouseenter = () => {
@@ -339,22 +354,35 @@ function updateStopwatchDisplay(stopwatch) {
 }
 
 // Update frequency controls
-function updateFrequencyControls(frequency, task) {
+function updateFrequencyControls(frequency, task, customSound) {
   if (!timerElement) return;
   const freqControls = timerElement.querySelector('.freq-controls');
   const freqValue = timerElement.querySelector('#freq-value');
   const reminderIndicator = timerElement.querySelector('.reminder-indicator');
+  const uploadBtn = timerElement.querySelector('#sound-upload');
+  const soundStatus = timerElement.querySelector('.sound-status');
 
   if (task) {
-    freqValue.textContent = `${frequency} min`;
+    freqValue.textContent = frequency === 0 ? 'Off' : `${frequency} min`;
     if (frequency > 0) {
         reminderIndicator.style.display = 'block';
+        if (customSound) {
+            uploadBtn.style.display = 'none';
+            soundStatus.style.display = 'flex';
+        } else {
+            uploadBtn.style.display = 'inline-block';
+            soundStatus.style.display = 'none';
+        }
     } else {
         reminderIndicator.style.display = 'none';
+        uploadBtn.style.display = 'none';
+        soundStatus.style.display = 'none';
     }
   } else {
     freqControls.style.display = 'none';
     reminderIndicator.style.display = 'none';
+    uploadBtn.style.display = 'none';
+    soundStatus.style.display = 'none';
   }
 }
 
@@ -426,6 +454,51 @@ function adjustFrequency(change) {
     });
 }
 
+function openSoundUpload() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'audio/*';
+    input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const soundDataUrl = event.target.result;
+            chrome.runtime.sendMessage({ action: 'setCustomSound', sound: soundDataUrl });
+        };
+        reader.readAsDataURL(file);
+    };
+    input.click();
+}
+
+function playReminderSound() {
+  chrome.runtime.sendMessage({action: 'getTimerState'}, function(response) {
+    if (response && response.customReminderSound) {
+      const audio = new Audio(response.customReminderSound);
+      audio.volume = 0.1; // Play custom sound at a low volume
+      audio.play();
+    } else {
+      // Fallback to generated tone
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+
+      // Sound characteristics - softer and shorter
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(300, audioCtx.currentTime);
+      gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime); // Very low volume
+
+      // Play and stop the sound
+      oscillator.start(audioCtx.currentTime);
+      oscillator.stop(audioCtx.currentTime + 0.15); // Play for 0.15 seconds
+    }
+  });
+}
+
 // Listen for messages from background script
 chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
   switch(request.action) {
@@ -434,7 +507,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
       updateStartButton(request.isRunning);
       updateTaskDisplay(request.currentTask, request.isRunning, request.mode);
       updateStopwatchDisplay(request.stopwatch);
-      updateFrequencyControls(request.reminderFrequency, request.currentTask);
+      updateFrequencyControls(request.reminderFrequency, request.currentTask, request.customReminderSound);
       
       // Show/hide timer based on enabled state
       if (timerElement && reEnableDot) {
@@ -501,24 +574,6 @@ function playSound() {
   // Play and stop the sound
   oscillator.start(audioCtx.currentTime);
   oscillator.stop(audioCtx.currentTime + 0.5); // Play for 0.5 seconds
-}
-
-function playReminderSound() {
-  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  const oscillator = audioCtx.createOscillator();
-  const gainNode = audioCtx.createGain();
-
-  oscillator.connect(gainNode);
-  gainNode.connect(audioCtx.destination);
-
-  // Sound characteristics - softer and shorter
-  oscillator.type = 'sine';
-  oscillator.frequency.setValueAtTime(300, audioCtx.currentTime);
-  gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime); // Very low volume
-
-  // Play and stop the sound
-  oscillator.start(audioCtx.currentTime);
-  oscillator.stop(audioCtx.currentTime + 0.15); // Play for 0.15 seconds
 }
 
 // Initialize when DOM is ready

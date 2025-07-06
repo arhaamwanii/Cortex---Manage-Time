@@ -269,6 +269,59 @@
     border-color: #888;
 }
 
+.sound-btn {
+    background: transparent;
+    border: none;
+    color: #999;
+    cursor: pointer;
+    padding: 0;
+    font-size: 18px;
+    transition: all 0.2s ease;
+    display: none; /* Hidden by default */
+}
+
+.sound-btn:hover {
+    color: #fff;
+    transform: scale(1.1);
+}
+
+.sound-btn svg, .file-icon svg {
+    width: 16px;
+    height: 16px;
+    stroke: #999;
+    transition: all 0.2s ease;
+}
+
+.sound-btn:hover svg {
+    stroke: #fff;
+}
+
+.sound-status {
+    display: none; /* Hidden by default */
+    align-items: center;
+    gap: 5px;
+}
+
+.sound-status .file-icon {
+    font-size: 16px;
+}
+
+.sound-status .remove-sound-btn {
+    background: transparent;
+    border: none;
+    color: #999;
+    cursor: pointer;
+    padding: 0;
+    font-size: 18px;
+    line-height: 1;
+    transition: all 0.2s ease;
+}
+
+.sound-status .remove-sound-btn:hover {
+    color: #ff6b6b;
+    transform: scale(1.1);
+}
+
 #freq-value {
     font-size: 14px;
     color: #ccc;

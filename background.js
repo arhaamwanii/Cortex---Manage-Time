@@ -7,7 +7,8 @@ let globalTimer = {
   enabled: true,
   currentTask: '',
   mode: 'pomodoro', // 'pomodoro' or 'stopwatch'
-  reminderFrequency: 2 // in minutes
+  reminderFrequency: 2, // in minutes
+  customReminderSound: null
 };
 
 let stopwatch = {
@@ -33,6 +34,7 @@ chrome.storage.sync.get(['timerState', 'timerDuration', 'timerEnabled', 'stopwat
     globalTimer.currentTask = result.timerState.currentTask || '';
     globalTimer.mode = result.timerState.mode || 'pomodoro';
     globalTimer.reminderFrequency = result.timerState.reminderFrequency || 2;
+    globalTimer.customReminderSound = result.timerState.customReminderSound || null;
     
     // Resume timer if it was running and enabled
     if (globalTimer.isRunning && globalTimer.enabled) {
@@ -124,7 +126,8 @@ function broadcastTimerUpdate() {
         currentTask: globalTimer.currentTask,
         mode: globalTimer.mode,
         stopwatch: stopwatch,
-        reminderFrequency: globalTimer.reminderFrequency
+        reminderFrequency: globalTimer.reminderFrequency,
+        customReminderSound: globalTimer.customReminderSound
       }).catch(() => {}); // Ignore errors for inactive tabs
     });
   });
@@ -180,7 +183,8 @@ function saveTimerState() {
       defaultTime: globalTimer.defaultTime,
       currentTask: globalTimer.currentTask,
       mode: globalTimer.mode,
-      reminderFrequency: globalTimer.reminderFrequency
+      reminderFrequency: globalTimer.reminderFrequency,
+      customReminderSound: globalTimer.customReminderSound
     },
     timerEnabled: globalTimer.enabled,
     stopwatchState: stopwatch
@@ -198,7 +202,8 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
         enabled: globalTimer.enabled,
         currentTask: globalTimer.currentTask,
         mode: globalTimer.mode,
-        reminderFrequency: globalTimer.reminderFrequency
+        reminderFrequency: globalTimer.reminderFrequency,
+        customReminderSound: globalTimer.customReminderSound
       });
       break;
       
@@ -275,6 +280,16 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
       saveTimerState();
       broadcastTimerUpdate();
       break;
+      
+    case 'setCustomSound':
+        globalTimer.customReminderSound = request.sound;
+        saveTimerState();
+        break;
+
+    case 'removeCustomSound':
+        globalTimer.customReminderSound = null;
+        saveTimerState();
+        break;
   }
 });
 
