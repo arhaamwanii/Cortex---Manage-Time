@@ -37,13 +37,49 @@ The timer appears as a floating element that you can:
 - **Customizable duration** (default: 25 minutes)
 - **Responsive design** that works on any screen size
 
-## Installation
+## Installation Guide (For Non-Developers)
 
-1. Download or clone this repository
-2. Open Chrome and go to `chrome://extensions/`
-3. Enable "Developer mode" in the top right
-4. Click "Load unpacked" and select the extension folder
-5. The timer will appear on every website you visit
+### Step 1: Download the Extension Files
+1. **Download the ZIP file**: Click the green "Code" button on this page, then select "Download ZIP"
+2. **Extract the files**: 
+   - On Windows: Right-click the ZIP file and select "Extract All"
+   - On Mac: Double-click the ZIP file to extract
+   - On Linux: Right-click and select "Extract Here"
+3. **Remember the folder location**: Note where you extracted the files - you'll need this in Step 4
+
+### Step 2: Open Chrome Extensions Page
+1. Open Google Chrome
+2. Type `chrome://extensions/` in the address bar and press Enter
+3. You should see a page with your installed extensions
+
+### Step 3: Enable Developer Mode
+1. Look for the toggle switch labeled "Developer mode" in the top-right corner
+2. Turn it ON (it will turn blue)
+3. You'll see new options appear below
+
+### Step 4: Load the Extension
+1. Click the "Load unpacked" button that appeared after enabling Developer mode
+2. A file browser window will open
+3. Navigate to the folder where you extracted the CORTEX files
+4. Select the folder (not individual files) and click "Select Folder"
+5. You should see CORTEX appear in your extensions list
+
+### Step 5: Verify Installation
+1. Look for CORTEX in your extensions list
+2. Make sure the toggle switch next to it is ON (blue)
+3. Open a new tab - you should see the timer centered on a black background
+4. Visit any website - you should see the floating timer appear
+
+### Troubleshooting
+- **Extension not appearing?** Make sure you selected the folder containing the files, not individual files
+- **Timer not showing?** Try refreshing the page or opening a new tab
+- **Permission errors?** Make sure you enabled Developer mode first
+
+### What You Should See
+- A floating timer on every website you visit
+- The timer can be dragged around and positioned anywhere
+- Hover over the timer to see Start/Pause, Reset, and Set Time buttons
+- New tabs show the timer centered on a black background
 
 ## Usage
 
