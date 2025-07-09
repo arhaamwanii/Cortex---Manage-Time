@@ -781,12 +781,48 @@ setInterval(() => {
     return;
   }
   
-  if (timerElement) {
-    reportActualTimerState();
-  } else {
-    console.log('CONTENT: Periodic check - timer element not found');
+  reportActualTimerState();
+}, 2000);
+
+// PAGE VISIBILITY API: Handle tab becoming active again after Chrome suspension
+console.log('CONTENT: Setting up page visibility listeners for tab activation detection');
+
+// Listen for visibility changes (primary method)
+document.addEventListener('visibilitychange', function() {
+  if (!document.hidden && !isNewTabPage()) {
+    console.log('CONTENT: Tab became visible - refreshing timer state');
+    requestTimerState();
+    
+    // Also request again after a short delay to handle any timing issues
+    setTimeout(() => {
+      requestTimerState();
+    }, 500);
   }
-}, 2000); // Report every 2 seconds to keep popup in sync
+});
+
+// Listen for window focus (backup method)
+window.addEventListener('focus', function() {
+  if (!isNewTabPage()) {
+    console.log('CONTENT: Window gained focus - refreshing timer state');
+    requestTimerState();
+  }
+});
+
+// Listen for pageshow event (handles back/forward cache)
+window.addEventListener('pageshow', function(event) {
+  if (!isNewTabPage()) {
+    console.log('CONTENT: Page shown (persisted:', event.persisted, ') - refreshing timer state');
+    requestTimerState();
+  }
+});
+
+// Also refresh state when page loads/reloads
+window.addEventListener('load', function() {
+  if (!isNewTabPage()) {
+    console.log('CONTENT: Page loaded - refreshing timer state');
+    requestTimerState();
+  }
+});
 
 // Only request notification permission when timer completes, not on every page load
 

@@ -482,6 +482,48 @@ if (document.readyState === 'loading') {
     initialize();
 }
 
+// PAGE VISIBILITY API: Handle tab becoming active again after Chrome suspension
+console.log('NEWTAB: Setting up page visibility listeners for tab activation detection');
+
+// Listen for visibility changes (primary method)
+document.addEventListener('visibilitychange', function() {
+    if (!document.hidden) {
+        debugLog('Tab became visible - refreshing timer state');
+        if (isInitialized && timerElement) {
+            requestTimerState();
+            
+            // Also request again after a short delay to handle any timing issues
+            setTimeout(() => {
+                requestTimerState();
+            }, 500);
+        }
+    }
+});
+
+// Listen for window focus (backup method)
+window.addEventListener('focus', function() {
+    debugLog('Window gained focus - refreshing timer state');
+    if (isInitialized && timerElement) {
+        requestTimerState();
+    }
+});
+
+// Listen for pageshow event (handles back/forward cache)
+window.addEventListener('pageshow', function(event) {
+    debugLog('Page shown (persisted:', event.persisted, ') - refreshing timer state');
+    if (isInitialized && timerElement) {
+        requestTimerState();
+    }
+});
+
+// Also refresh state when page loads/reloads
+window.addEventListener('load', function() {
+    debugLog('Page loaded - refreshing timer state');
+    if (isInitialized && timerElement) {
+        requestTimerState();
+    }
+});
+
 // Cleanup on page unload
 window.addEventListener('beforeunload', () => {
     stopPeriodicSync();
