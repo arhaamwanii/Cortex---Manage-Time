@@ -1,10 +1,10 @@
-# Privacy Policy for CORTEX - Smart Pomodoro Timer
+# Privacy Policy for Elevate
 
 **Last Updated: January 2024**
 
 ## 1. Introduction
 
-Thank you for choosing CORTEX - Smart Pomodoro Timer ("the Extension," "we," "us"). Your privacy is critically important to us. This Privacy Policy is designed to give you a clear understanding of what data the Extension collects, why it's collected, and how it is handled.
+Thank you for choosing Elevate ("the Extension," "we," "us"). Your privacy is critically important to us. This Privacy Policy is designed to give you a clear understanding of what data the Extension collects, why it's collected, and how it is handled.
 
 This policy affirms our commitment to transparency and responsible data practices in compliance with the Google Chrome Web Store Developer Program Policies.
 
@@ -43,7 +43,7 @@ We **do not** share, sell, rent, or transfer any user data to any third parties 
 
 We strictly adhere to the policies set forth by the Google Chrome Web Store.
 
-**The use and transfer of information received from Google APIs by CORTEX - Smart Pomodoro Timer will adhere to the Chrome Web Store User Data Policy, including the Limited Use requirements.**
+**The use and transfer of information received from Google APIs by Elevate will adhere to the Chrome Web Store User Data Policy, including the Limited Use requirements.**
 
 ## 7. Managing and Deleting Your Data
 

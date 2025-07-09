@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "CORTEX - Smart Pomodoro Timer",
+  "name": "Elevate",
   "version": "1.0",
-  "description": "CORTEX: A smart, floating Pomodoro timer that follows you across every website for focused productivity",
+  "description": "Elevate: Rise Above Distractions. A smart, floating Pomodoro timer that follows you across every website for focused productivity",
   "permissions": [
     "activeTab",
     "storage",
@@ -24,7 +24,7 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "CORTEX Timer Controls"
+    "default_title": "Elevate Timer Controls"
   },
   "icons": {
     "16": "icon/icon16.png",
