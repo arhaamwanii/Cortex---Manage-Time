@@ -1,34 +1,52 @@
-# Features
+# CORTEX - Smart Pomodoro Timer: Features
 
-The CORTEX Pomodoro Timer is designed to be a simple yet powerful tool for focus. Here are its core features:
+CORTEX is a sophisticated, floating Pomodoro timer designed to enhance productivity by providing a persistent, feature-rich time management tool that follows you across the web.
 
-### 1. Floating Timer on Every Page
-The timer is injected into every website you visit, ensuring it's always visible and accessible. You don't need to switch to a specific tab to see or control your timer.
+## Core Functionality
 
-### 2. Draggable and Position-Aware
-You can drag and drop the timer anywhere on your screen. The extension is smart enough to remember the timer's position on a per-website basis. For example, you can have it on the top-right on Google Docs and bottom-left on GitHub.
+- **Floating Timer:** A persistent, floating timer is injected onto every website you visit, ensuring your session is always visible.
+- **Draggable Interface:** The timer can be freely dragged and repositioned anywhere on the screen.
+- **Per-Domain Position Memory:** The timer's position is saved for each individual website (domain), so it will always appear where you last left it on that site.
+- **New Tab Integration:** The extension overrides the default new tab page, placing the timer in the center of the screen for immediate focus.
 
-### 3. Dual Modes: Pomodoro and Stopwatch
-The timer can operate in two modes:
-- **Pomodoro Mode:** A countdown timer for focused work intervals. You can set any duration you like.
-- **Stopwatch Mode:** A count-up timer to track time on a task without a predefined limit.
+## Timer Modes
 
-You can instantly switch between these modes with a single click.
+The extension offers two primary modes to suit different work styles:
 
-### 4. Persistent and Synchronized State
-The timer's state (current time, running status, task, etc.) is saved using `chrome.storage.sync`. This means:
-- **It survives browser restarts:** If you were in the middle of a Pomodoro session and you close your browser, the timer will resume from where it left off when you open it again.
-- **It syncs across devices:** If you are logged into your Google account on multiple computers, the timer state will be synchronized between them.
+- **Pomodoro Mode:** A classic countdown timer to structure work into focused intervals. The duration for the Pomodoro session can be customized.
+- **Stopwatch Mode:** A count-up timer that allows you to track time without a predefined limit.
 
-### 5. Configurable Duration and Task
-- **Set Duration:** You can easily change the duration of the Pomodoro timer by clicking the "Set" button.
-- **Set Task:** You can add a label for your current task, which is displayed directly on the timer. This helps you stay focused on the task at hand. This also serves as a subtle, constant reminder of your goal.
+## Timer Controls
 
-### 6. Minimizable UI
-If the timer feels intrusive, you can minimize it with the "×" button. It will shrink into a small, colored dot on the side of the screen. You can click the dot to bring the full timer back. The dot is also draggable.
+The timer controls are designed to be unobtrusive, appearing only when you hover over the timer element.
 
-### 7. New Tab Page Integration
-When you open a new tab, the CORTEX timer appears centered on the screen. This turns your new tab page into a focused environment, reminding you of your current task and timer status.
+- **Start / Pause:** Begin or pause the current timer session.
+- **Reset:** Reset the timer back to its default state or zero.
+- **Set Duration:** A prompt allows you to define a custom duration (in minutes) for your Pomodoro sessions.
+- **Switch Mode:** Instantly toggle between Pomodoro and Stopwatch modes.
 
-### 8. Audio Alert on Completion
-When a Pomodoro countdown finishes, the extension plays a sound to notify you that your work session is over and it's time for a break. 
+## Task Management
+
+- **Set Current Task:** You can define your current task, which will be prominently displayed on the timer, helping you stay focused on the objective.
+
+## Notifications & Reminders
+
+- **Task Reminders:** When a task is set and the timer is running, the extension provides periodic, gentle sound notifications to keep you engaged.
+- **Adjustable Frequency:** The interval for these reminders can be easily adjusted to be more or less frequent.
+- **Custom Sounds:** You can upload your own audio file to be used as the reminder sound for a personalized experience.
+
+## User Interface & Experience
+
+- **Modern Design:** The timer features a clean, modern, dark-themed aesthetic with semi-transparent and blurred background effects (`backdrop-filter`) that blend seamlessly with any website.
+- **Minimizable:** The entire timer can be minimized into a small, colored dot to reduce screen clutter. This dot can also be dragged and repositioned.
+- **One-Click Restore:** Clicking the minimized dot instantly restores the full timer interface.
+- **Contextual Controls:** Controls for the timer and reminder frequency are hidden by default and only appear on hover, maintaining a clean and focused UI.
+
+## Synchronization & Persistence
+
+- **Cross-Tab Sync:** The timer's state, including the current time, mode, running status, and task, is synchronized across all open tabs in real-time.
+- **Session Persistence:** The timer's state is saved and automatically restored when you close and reopen your browser, ensuring you never lose your session.
+
+## Secondary Stopwatch
+
+- **Independent Stopwatch:** In addition to the main timer modes, a secondary, simple stopwatch is available for miscellaneous time tracking. It can be started and stopped independently of the main Pomoro/Stopwatch timer.
