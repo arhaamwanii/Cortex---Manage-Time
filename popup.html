@@ -3,57 +3,447 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CORTEX Timer</title>
+    <title>Elevate Timer Controls</title>
     <style>
-        body {
-            width: 250px;
-            height: 150px;
-            padding: 20px;
+        * {
             margin: 0;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 380px;
             background: #000000;
-            color: #ccc;
+            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 14px;
+            overflow-x: hidden;
+        }
+
+        .container {
+            padding: 20px;
+        }
+
+        .header {
             display: flex;
-            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .logo {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, #FFA500, #FF6B35);
+            border-radius: 8px;
+            display: flex;
             align-items: center;
             justify-content: center;
+            font-size: 18px;
+            font-weight: bold;
+            color: #000;
+        }
+
+        .logo::before {
+            content: '⚡';
+        }
+
+        .title {
+            font-size: 24px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #FFA500, #FF6B35);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            color: #888;
+            margin-bottom: 24px;
+            font-size: 13px;
+        }
+
+        /* Timer Display Section */
+        .timer-section {
+            background: linear-gradient(135deg, rgba(255, 165, 0, 0.1), rgba(255, 107, 53, 0.1));
+            border: 1px solid rgba(255, 165, 0, 0.2);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
             text-align: center;
         }
-        
-        .title {
-            font-size: 18px;
+
+        .timer-display {
+            font-size: 36px;
+            font-weight: 700;
+            color: #FFA500;
+            margin-bottom: 12px;
+            font-family: 'SF Mono', Consolas, monospace;
+        }
+
+        .timer-status {
+            color: #888;
+            font-size: 12px;
+            margin-bottom: 16px;
+        }
+
+        .timer-controls {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .timer-btn {
+            background: rgba(255, 165, 0, 0.1);
+            border: 1px solid rgba(255, 165, 0, 0.3);
+            color: #FFA500;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            min-width: 60px;
+        }
+
+        .timer-btn:hover {
+            background: rgba(255, 165, 0, 0.2);
+            border-color: rgba(255, 165, 0, 0.5);
+        }
+
+        .timer-btn.primary {
+            background: linear-gradient(135deg, #FFA500, #FF6B35);
+            color: #000;
+            border-color: transparent;
             font-weight: 600;
-            color: #4CAF50;
-            margin: 0 0 15px 0;
         }
 
-        p {
+        .timer-btn.primary:hover {
+            box-shadow: 0 0 15px rgba(255, 165, 0, 0.3);
+        }
+
+        /* Task Section */
+        .task-section {
+            margin-bottom: 20px;
+        }
+
+        .task-input {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #fff;
+            padding: 12px;
+            border-radius: 8px;
             font-size: 14px;
-            line-height: 1.5;
-            margin: 0;
+            margin-bottom: 8px;
         }
 
-        a {
-            color: #4CAF50;
+        .task-input::placeholder {
+            color: #666;
+        }
+
+        .task-input:focus {
+            outline: none;
+            border-color: rgba(255, 165, 0, 0.5);
+            box-shadow: 0 0 0 2px rgba(255, 165, 0, 0.1);
+        }
+
+        .current-task {
+            background: rgba(255, 165, 0, 0.05);
+            border: 1px solid rgba(255, 165, 0, 0.2);
+            border-radius: 8px;
+            padding: 12px;
+            color: #FFA500;
+            font-size: 13px;
+            margin-bottom: 8px;
+        }
+
+        .current-task.empty {
+            color: #666;
+            border-color: rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        /* Settings Section */
+        .settings-section {
+            margin-bottom: 20px;
+        }
+
+        .setting-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .setting-label {
+            color: #ccc;
+            font-size: 13px;
+        }
+
+        .setting-control {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .duration-input {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #fff;
+            padding: 6px 8px;
+            border-radius: 4px;
+            width: 60px;
+            text-align: center;
+            font-size: 12px;
+        }
+
+        .mode-switch {
+            background: rgba(255, 165, 0, 0.1);
+            border: 1px solid rgba(255, 165, 0, 0.3);
+            color: #FFA500;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s ease;
+        }
+
+        .mode-switch:hover {
+            background: rgba(255, 165, 0, 0.2);
+        }
+
+        /* Toggle Switches */
+        .controls-section {
+            margin-bottom: 20px;
+        }
+
+        .control-group {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .control-group:hover {
+            border-color: rgba(255, 165, 0, 0.3);
+            background: rgba(255, 165, 0, 0.05);
+        }
+
+        .control-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .control-label {
+            font-size: 16px;
+            font-weight: 600;
+            color: #ffffff;
+        }
+
+        .toggle-switch {
+            width: 50px;
+            height: 26px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .toggle-switch.active {
+            background: linear-gradient(135deg, #FFA500, #FF6B35);
+            border-color: #FFA500;
+        }
+
+        .toggle-slider {
+            width: 20px;
+            height: 20px;
+            background: #ffffff;
+            border-radius: 50%;
+            position: absolute;
+            top: 2px;
+            left: 3px;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .toggle-switch.active .toggle-slider {
+            transform: translateX(24px);
+            background: #000000;
+        }
+
+        .control-description {
+            color: #999;
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #666;
+            transition: all 0.3s ease;
+        }
+
+        .status-dot.active {
+            background: #4CAF50;
+            box-shadow: 0 0 8px rgba(76, 175, 80, 0.5);
+        }
+
+        .status-text {
+            color: #888;
+            font-size: 11px;
+        }
+
+        .footer {
+            text-align: center;
+            padding-top: 16px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .footer-text {
+            color: #666;
+            font-size: 11px;
+        }
+
+        .footer-link {
+            color: #FFA500;
             text-decoration: none;
+            font-weight: 500;
         }
 
-        a:hover {
+        .footer-link:hover {
             text-decoration: underline;
+        }
+
+        /* Sections */
+        .section-title {
+            color: #FFA500;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            padding-bottom: 4px;
+            border-bottom: 1px solid rgba(255, 165, 0, 0.2);
+        }
+
+        .compact-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .compact-btn {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #ccc;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 11px;
+            text-align: center;
+            transition: all 0.2s ease;
+        }
+
+        .compact-btn:hover {
+            border-color: rgba(255, 165, 0, 0.3);
+            color: #FFA500;
         }
     </style>
 </head>
 <body>
-    <h1 class="title">CORTEX</h1>
-    <p>All controls are on the draggable timer on your screen. To disable the extension, visit <a id="extensionsLink" href="chrome://extensions" target="_blank">chrome://extensions</a>.</p>
-    <script>
-        const isBrave = navigator.userAgent.includes('Brave');
-        const extensionsUrl = isBrave ? 'brave://extensions' : 'chrome://extensions';
-        const link = document.getElementById('extensionsLink');
-        if (link) {
-            link.href = extensionsUrl;
-            link.textContent = extensionsUrl;
-        }
-    </script>
+    <div class="container">
+        <div class="header">
+            <div class="logo"></div>
+            <h1 class="title">Elevate</h1>
+        </div>
+        
+        <p class="subtitle">Rise Above Distractions</p>
+        
+        <!-- Timer Display & Controls -->
+        <div class="timer-section">
+            <div class="timer-display" id="timerDisplay">25:00</div>
+            <div class="timer-status" id="timerStatus">Pomodoro Mode • Ready</div>
+            <div class="timer-controls">
+                <button class="timer-btn primary" id="startStopBtn">Start</button>
+                <button class="timer-btn" id="resetBtn">Reset</button>
+                <button class="timer-btn" id="modeBtn">Stopwatch</button>
+            </div>
+        </div>
+
+        <!-- Task Management -->
+        <div class="task-section">
+            <div class="section-title">Current Task</div>
+            <div class="current-task empty" id="currentTask">No task set</div>
+            <input type="text" class="task-input" id="taskInput" placeholder="Set your current task..." maxlength="50">
+        </div>
+
+        <!-- Settings -->
+        <div class="settings-section">
+            <div class="section-title">Settings</div>
+            <div class="compact-row">
+                <span class="setting-label">Duration</span>
+                <div class="setting-control">
+                    <input type="number" class="duration-input" id="durationInput" min="1" max="90" value="25">
+                    <span style="color: #666; font-size: 11px;">min</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Feature Toggles -->
+        <div class="controls-section">
+            <div class="control-group">
+                <div class="control-header">
+                    <span class="control-label">Floating Timer</span>
+                    <div class="toggle-switch" id="timerToggle">
+                        <div class="toggle-slider"></div>
+                    </div>
+                </div>
+                <div class="control-description">Show draggable timer on all websites</div>
+                <div class="status-indicator">
+                    <div class="status-dot" id="timerStatus"></div>
+                    <span class="status-text" id="timerStatusText">Checking...</span>
+                </div>
+            </div>
+            
+            <div class="control-group">
+                <div class="control-header">
+                    <span class="control-label">New Tab Override</span>
+                    <div class="toggle-switch" id="newtabToggle">
+                        <div class="toggle-slider"></div>
+                    </div>
+                </div>
+                <div class="control-description">Replace new tab with focused timer page</div>
+                <div class="status-indicator">
+                    <div class="status-dot" id="newtabStatus"></div>
+                    <span class="status-text" id="newtabStatusText">Checking...</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p class="footer-text">
+                Visit <a href="#" class="footer-link" id="extensionsLink">extensions page</a> for advanced settings
+            </p>
+        </div>
+    </div>
+
+    <script src="popup.js"></script>
 </body>
 </html>

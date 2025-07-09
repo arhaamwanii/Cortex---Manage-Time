@@ -6,15 +6,38 @@ let dragOffset = { x: 0, y: 0 };
 let currentPosition = null; // Set to null initially
 const currentDomain = window.location.hostname;
 
+// Check if we're on a new tab page
+function isNewTabPage() {
+  return window.location.href.startsWith('chrome-extension://') && window.location.pathname.includes('newtab.html');
+}
+
 // Initialize timer
 function init() {
+  console.log('CONTENT: Initializing timer on', window.location.href);
+  
+  if (isNewTabPage()) {
+    console.log('CONTENT: On new tab page - will create timer independently');
+    // On new tab, we'll handle timer creation specially
+    createReEnableDot();  // Create re-enable dot but don't show it on new tab
+    if (reEnableDot) reEnableDot.style.display = 'none'; // Always hide on new tab
+    // Don't call createTimerElement here - new tab will handle it
+    return; // Don't request timer state - new tab will handle it independently
+  }
+  
   createTimerElement(); // Create it first
+  createReEnableDot();  // Create re-enable dot
   loadPosition();       // Then load and apply the correct position
-  requestTimerState();
+  requestTimerState();  // Request current state from background
 }
 
 // Load saved position for this domain
 function loadPosition() {
+  // Check if we're on a new tab page - don't apply positioning
+  if (isNewTabPage()) {
+    console.log('CONTENT: On new tab page, skipping position loading (will be centered via CSS)');
+    return;
+  }
+  
   chrome.storage.sync.get([`position_${currentDomain}`], function(result) {
     if (result[`position_${currentDomain}`]) {
       currentPosition = result[`position_${currentDomain}`];
@@ -35,6 +58,12 @@ function loadPosition() {
 
 // Save position for this domain
 function savePosition() {
+  // Don't save position for new tab page
+  if (isNewTabPage()) {
+    console.log('CONTENT: On new tab page, skipping position saving');
+    return;
+  }
+  
   chrome.storage.sync.set({
     [`position_${currentDomain}`]: currentPosition
   });
@@ -42,22 +71,53 @@ function savePosition() {
 
 // Request timer state from background
 function requestTimerState() {
+  console.log('CONTENT: Requesting timer state from background...');
   chrome.runtime.sendMessage({action: 'getTimerState'}, function(response) {
-    if (response && timerElement) {
-      updateDisplay(response.timeLeft, response.mode);
-      updateStartButton(response.isRunning);
-      updateTaskDisplay(response.currentTask, response.isRunning, response.mode);
-      updateStopwatchDisplay(response.stopwatch);
-      updateFrequencyControls(response.reminderFrequency, response.currentTask, response.customReminderSound);
+    if (chrome.runtime.lastError) {
+      console.error('CONTENT: Failed to get timer state:', chrome.runtime.lastError);
+      // Retry after a delay
+      setTimeout(() => {
+        console.log('CONTENT: Retrying timer state request...');
+        requestTimerState();
+      }, 2000);
+      return;
+    }
+    
+    if (response) {
+      console.log('CONTENT: Received timer state:', response, 'Timer element exists:', !!timerElement);
       
-      // Show/hide timer based on enabled state
-      if (response.enabled) {
-        timerElement.style.display = 'block';
-        reEnableDot.style.display = 'none';
-      } else {
-        timerElement.style.display = 'none';
-        reEnableDot.style.display = 'block';
+      // Create timer element if it doesn't exist and we're enabled
+      if (response.enabled && !timerElement) {
+        console.log('CONTENT: Creating timer element (was missing, timer enabled)');
+        createTimerElement();
+        loadPosition();
       }
+      
+      if (timerElement) {
+        updateDisplay(response.timeLeft, response.mode);
+        updateStartButton(response.isRunning);
+        updateTaskDisplay(response.currentTask, response.isRunning, response.mode);
+        updateStopwatchDisplay(response.stopwatch);
+        updateFrequencyControls(response.reminderFrequency, response.currentTask, response.customReminderSound);
+      }
+      
+      // Show/REMOVE timer based on enabled state - COMPLETE REMOVAL, not hiding
+      console.log('CONTENT: Timer enabled state:', response.enabled);
+      if (response.enabled) {
+        console.log('Content script showing timer');
+        if (timerElement) timerElement.style.display = 'block';
+        if (reEnableDot) reEnableDot.style.display = 'none';
+      } else {
+        console.log('Content script REMOVING timer completely from DOM');
+        if (timerElement) {
+          timerElement.remove();
+          timerElement = null;
+        }
+        // No need to show re-enable dot here since this is initial state check
+        if (reEnableDot) reEnableDot.style.display = 'none';
+      }
+    } else {
+      console.log('No response or no timer element in content script');
     }
   });
 }
@@ -154,13 +214,18 @@ function createTimerElement() {
   reminderIndicator.title = 'Reminders are active';
   timerElement.appendChild(reminderIndicator);
   
-  // Add close button
+  // Add close button - TIMER CONTROLS POPUP
   const closeBtn = document.createElement('div');
   closeBtn.className = 'close-btn';
   closeBtn.innerHTML = '&times;';
   closeBtn.title = 'Minimize Timer';
   closeBtn.onclick = () => {
-    chrome.runtime.sendMessage({ action: 'toggleEnabled', enabled: false });
+    console.log('CONTENT: Close button clicked - hiding timer (not disabling)');
+    chrome.runtime.sendMessage({ action: 'toggleVisible', visible: false, source: 'closeButton' });
+    // TIMER IS AUTHORITY: Report immediately that we're being hidden
+    setTimeout(() => {
+      reportActualTimerState();
+    }, 50);
   };
   timerElement.appendChild(closeBtn);
   
@@ -189,7 +254,6 @@ function createTimerElement() {
   };
   
   document.body.appendChild(timerElement);
-  createReEnableDot();
 }
 
 // Create the dot to re-enable the timer
@@ -201,7 +265,23 @@ function createReEnableDot() {
   reEnableDot.style.display = 'none'; // Hidden by default
   
   reEnableDot.onclick = () => {
-    chrome.runtime.sendMessage({ action: 'toggleEnabled', enabled: true });
+    console.log('CONTENT: Re-enable dot clicked - showing timer');
+    chrome.runtime.sendMessage({ action: 'toggleVisible', visible: true, source: 'reEnableDot' }, function(response) {
+      if (chrome.runtime.lastError) {
+        console.error('CONTENT: Error showing timer:', chrome.runtime.lastError);
+        // Retry after delay
+        setTimeout(() => {
+          console.log('CONTENT: Retrying show after error...');
+          chrome.runtime.sendMessage({ action: 'toggleVisible', visible: true, source: 'reEnableDot' });
+        }, 1000);
+        return;
+      }
+      console.log('CONTENT: Re-enable response:', response);
+      // TIMER IS AUTHORITY: Report immediately that we're being shown
+      setTimeout(() => {
+        reportActualTimerState();
+      }, 50);
+    });
   };
 
   document.body.appendChild(reEnableDot);
@@ -499,6 +579,29 @@ function playReminderSound() {
   });
 }
 
+// TIMER IS AUTHORITY: Report actual state to background for popup sync
+function reportActualTimerState() {
+  // Skip reporting on new tab pages - they are independent
+  if (isNewTabPage()) {
+    console.log('CONTENT: On new tab page - skipping state reporting');
+    return;
+  }
+  
+  // CRITICAL FIX: Always return boolean, never null
+  // Timer is visible if element exists AND is not hidden
+  const actuallyVisible = !!(timerElement && timerElement.style.display !== 'none' && timerElement.parentNode);
+  
+  console.log('CONTENT: Reporting timer state - visible:', actuallyVisible, 'element exists:', !!timerElement, 'display style:', timerElement ? timerElement.style.display : 'N/A', 'in DOM:', timerElement ? !!timerElement.parentNode : false);
+  
+  chrome.runtime.sendMessage({
+    action: 'reportTimerState',
+    actuallyVisible: actuallyVisible,
+    timestamp: Date.now()
+  }).catch(() => {
+    console.log('CONTENT: Could not report state to background');
+  });
+}
+
 // Listen for messages from background script
 chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
   switch(request.action) {
@@ -509,16 +612,103 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
       updateStopwatchDisplay(request.stopwatch);
       updateFrequencyControls(request.reminderFrequency, request.currentTask, request.customReminderSound);
       
-      // Show/hide timer based on enabled state
-      if (timerElement && reEnableDot) {
-        if (request.enabled) {
-          timerElement.style.display = 'block';
-          reEnableDot.style.display = 'none';
-        } else {
-          timerElement.style.display = 'none';
-          reEnableDot.style.display = 'block';
-        }
+      // Skip visibility control on new tab pages - they handle their own state
+      if (isNewTabPage()) {
+        console.log('CONTENT: On new tab page - ignoring visibility state changes');
+        return;
       }
+      
+      // Handle timer visibility based on both enabled and timerVisible states
+      console.log('CONTENT: received updateTimerDisplay, enabled:', request.enabled, 'timerVisible:', request.timerVisible);
+      
+      if (!request.enabled) {
+        // Timer is completely disabled - remove everything
+        console.log('CONTENT: Timer is disabled - removing everything');
+        if (timerElement) {
+          timerElement.remove();
+          timerElement = null;
+        }
+        if (reEnableDot) reEnableDot.style.display = 'none';
+      } else if (request.enabled && request.timerVisible) {
+        // Timer is enabled and should be visible
+        console.log('CONTENT: Timer is enabled and visible - showing timer');
+        if (!timerElement) {
+          console.log('CONTENT: Creating timer element (was removed)');
+          createTimerElement();
+          loadPosition();
+        }
+        if (timerElement) timerElement.style.display = 'block';
+        if (reEnableDot) reEnableDot.style.display = 'none';
+      } else if (request.enabled && !request.timerVisible) {
+        // Timer is enabled but hidden (X button was clicked)
+        console.log('CONTENT: Timer is enabled but hidden - showing re-enable dot');
+        if (timerElement) {
+          timerElement.remove();
+          timerElement = null;
+        }
+        // Show re-enable dot
+        if (!reEnableDot) {
+          console.log('CONTENT: Creating re-enable dot (was missing)');
+          createReEnableDot();
+        }
+        if (reEnableDot) reEnableDot.style.display = 'block';
+      }
+      
+      // TIMER CONTROLS POPUP: Report our actual state after change
+      setTimeout(reportActualTimerState, 100);
+      break;
+      
+    case 'forceStateSync':
+      // Skip force sync on new tab pages - they handle their own state
+      if (isNewTabPage()) {
+        console.log('CONTENT: On new tab page - ignoring force sync');
+        return;
+      }
+      
+      // FORCE SYNC: Background is forcing us to sync
+      console.log('CONTENT: Force sync received, enabled:', request.enabled, 'timerVisible:', request.timerVisible);
+      
+      if (!request.enabled) {
+        // Timer is completely disabled - remove everything
+        console.log('CONTENT: Force sync - timer is disabled, removing everything');
+        if (timerElement) {
+          timerElement.remove();
+          timerElement = null;
+        }
+        if (reEnableDot) reEnableDot.style.display = 'none';
+      } else if (request.enabled && request.timerVisible) {
+        // Timer is enabled and should be visible
+        console.log('CONTENT: Force sync - timer is enabled and visible');
+        if (!timerElement) {
+          console.log('CONTENT: Force sync - creating timer element (was removed)');
+          createTimerElement();
+          loadPosition();
+        }
+        updateDisplay(request.timeLeft, request.mode);
+        updateStartButton(request.isRunning);
+        updateTaskDisplay(request.currentTask, request.isRunning, request.mode);
+        updateStopwatchDisplay(request.stopwatch);
+        updateFrequencyControls(request.reminderFrequency, request.currentTask, request.customReminderSound);
+        
+        if (timerElement) timerElement.style.display = 'block';
+        if (reEnableDot) reEnableDot.style.display = 'none';
+      } else if (request.enabled && !request.timerVisible) {
+        // Timer is enabled but hidden (X button was clicked)
+        console.log('CONTENT: Force sync - timer is enabled but hidden');
+        if (timerElement) {
+          timerElement.remove();
+          timerElement = null;
+        }
+        // Show re-enable dot
+        if (!reEnableDot) {
+          console.log('CONTENT: Creating re-enable dot (was missing)');
+          createReEnableDot();
+        }
+        if (reEnableDot) reEnableDot.style.display = 'block';
+      }
+      
+      // Report back our state after force sync
+      setTimeout(reportActualTimerState, 200);
       break;
       
     case 'remindTask':
@@ -583,4 +773,27 @@ if (document.readyState === 'loading') {
   init();
 }
 
+// TIMER IS AUTHORITY: Report state periodically to ensure popup sync
+console.log('CONTENT: Starting timer state reporting every 2 seconds');
+setInterval(() => {
+  // Skip periodic reporting on new tab pages
+  if (isNewTabPage()) {
+    return;
+  }
+  
+  if (timerElement) {
+    reportActualTimerState();
+  } else {
+    console.log('CONTENT: Periodic check - timer element not found');
+  }
+}, 2000); // Report every 2 seconds to keep popup in sync
+
 // Only request notification permission when timer completes, not on every page load
+
+// Expose functions to global scope for new tab access
+window.createTimerElement = createTimerElement;
+window.updateDisplay = updateDisplay;
+window.updateStartButton = updateStartButton;
+window.updateTaskDisplay = updateTaskDisplay;
+window.updateStopwatchDisplay = updateStopwatchDisplay;
+window.updateFrequencyControls = updateFrequencyControls;

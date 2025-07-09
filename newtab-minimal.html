@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minimal Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 50px;
+            font-family: Arial, sans-serif;
+            background: #000000;
+            color: #ffffff;
+            text-align: center;
+        }
+        .status {
+            font-size: 18px;
+            margin: 20px;
+            padding: 20px;
+            border: 1px solid #333;
+            border-radius: 5px;
+        }
+        .success { border-color: #4CAF50; color: #4CAF50; }
+        .error { border-color: #f44336; color: #f44336; }
+        .warning { border-color: #ff9800; color: #ff9800; }
+        .immediate-test {
+            background: #ff0000;
+            color: #ffffff;
+            padding: 10px;
+            margin: 10px;
+            font-size: 20px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>MINIMAL EXTENSION TEST</h1>
+    <div class="immediate-test" id="immediateTest">BEFORE JAVASCRIPT</div>
+    <div id="status" class="status">Starting tests...</div>
+    
+    <script>
+        // IMMEDIATE BASIC TEST - Change the background color and text
+        console.log('=== FIRST LINE OF JAVASCRIPT EXECUTED ===');
+        document.body.style.background = '#002200'; // Dark green if JS works
+        document.getElementById('immediateTest').textContent = 'JAVASCRIPT IS WORKING!';
+        document.getElementById('immediateTest').style.background = '#00ff00'; // Green
+        document.getElementById('immediateTest').style.color = '#000000'; // Black text
+        
+        console.log('=== MINIMAL TEST STARTED ===');
+        
+        const statusEl = document.getElementById('status');
+        
+        function updateStatus(message, type = '') {
+            console.log('TEST:', message);
+            statusEl.textContent = message;
+            statusEl.className = 'status ' + type;
+        }
+        
+        function runTests() {
+            updateStatus('JavaScript is executing!', 'success');
+            
+            // Test 1: Basic DOM manipulation
+            console.log('✓ DOM manipulation working');
+            
+            // Test 2: Check current URL
+            console.log('Current URL:', window.location.href);
+            console.log('Is extension URL:', window.location.href.startsWith('chrome-extension://'));
+            
+            // Test 3: Chrome object exists
+            if (typeof chrome === 'undefined') {
+                updateStatus('FAILED: Chrome object not available!', 'error');
+                console.log('Available objects:', Object.getOwnPropertyNames(window));
+                return;
+            }
+            console.log('✓ Chrome object available');
+            
+            // Test 4: Chrome runtime exists
+            if (!chrome.runtime) {
+                updateStatus('FAILED: Chrome runtime not available!', 'error');
+                console.log('Chrome object contents:', Object.getOwnPropertyNames(chrome));
+                return;
+            }
+            console.log('✓ Chrome runtime available');
+            
+            // Test 5: Extension ID exists
+            if (!chrome.runtime.id) {
+                updateStatus('FAILED: Extension ID not available!', 'error');
+                console.log('Chrome runtime contents:', Object.getOwnPropertyNames(chrome.runtime));
+                return;
+            }
+            console.log('✓ Extension ID:', chrome.runtime.id);
+            
+            // Test 6: Storage API exists
+            if (!chrome.storage) {
+                updateStatus('FAILED: Chrome storage not available!', 'error');
+                return;
+            }
+            console.log('✓ Chrome storage available');
+            
+            // Test 7: Try ping to background
+            updateStatus('Testing background connection...', 'warning');
+            chrome.runtime.sendMessage({ action: 'ping' }, (response) => {
+                if (chrome.runtime.lastError) {
+                    updateStatus('FAILED: Background connection error: ' + chrome.runtime.lastError.message, 'error');
+                    console.error('Background error details:', chrome.runtime.lastError);
+                    return;
+                }
+                console.log('✓ Background ping response:', response);
+                
+                // Test 8: Try storage access
+                chrome.storage.sync.get(['newtabEnabled'], (result) => {
+                    if (chrome.runtime.lastError) {
+                        updateStatus('FAILED: Storage access error: ' + chrome.runtime.lastError.message, 'error');
+                        console.error('Storage error details:', chrome.runtime.lastError);
+                        return;
+                    }
+                    console.log('✓ Storage access successful, newtabEnabled:', result.newtabEnabled);
+                    
+                    // Final test: Try to force storage write
+                    chrome.storage.sync.set({ testKey: 'testValue' }, () => {
+                        if (chrome.runtime.lastError) {
+                            updateStatus('FAILED: Storage write error: ' + chrome.runtime.lastError.message, 'error');
+                            return;
+                        }
+                        console.log('✓ Storage write successful');
+                        updateStatus('ALL TESTS PASSED! Extension is working correctly.', 'success');
+                    });
+                });
+            });
+        }
+        
+        // Immediate execution test
+        console.log('=== IMMEDIATE EXECUTION TEST ===');
+        try {
+            runTests();
+        } catch (error) {
+            console.error('ERROR during execution:', error);
+            updateStatus('JAVASCRIPT ERROR: ' + error.message, 'error');
+        }
+        
+        // Also try when DOM is fully loaded
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                console.log('=== DOM READY TEST ===');
+                runTests();
+            });
+        }
+        
+        // And when window loads
+        window.addEventListener('load', () => {
+            console.log('=== WINDOW LOAD TEST ===');
+            runTests();
+        });
+        
+        console.log('=== MINIMAL TEST SCRIPT LOADED ===');
+    </script>
+</body>
+</html> 
