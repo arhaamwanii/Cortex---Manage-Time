@@ -34,27 +34,17 @@
         .logo {
             width: 32px;
             height: 32px;
-            background: linear-gradient(135deg, #FFA500, #FF6B35);
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px;
-            font-weight: bold;
-            color: #000;
-        }
-
-        .logo::before {
-            content: '⚡';
+            background-image: url('icon/icon128.png');
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            border-radius: 6px;
         }
 
         .title {
             font-size: 24px;
             font-weight: 700;
-            background: linear-gradient(135deg, #FFA500, #FF6B35);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            color: #FFA500;
         }
 
         .subtitle {
@@ -65,8 +55,8 @@
 
         /* Timer Display Section */
         .timer-section {
-            background: linear-gradient(135deg, rgba(255, 165, 0, 0.1), rgba(255, 107, 53, 0.1));
-            border: 1px solid rgba(255, 165, 0, 0.2);
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 12px;
             padding: 20px;
             margin-bottom: 20px;
@@ -76,7 +66,7 @@
         .timer-display {
             font-size: 36px;
             font-weight: 700;
-            color: #FFA500;
+            color: #ffffff;
             margin-bottom: 12px;
             font-family: 'SF Mono', Consolas, monospace;
         }
@@ -95,9 +85,9 @@
         }
 
         .timer-btn {
-            background: rgba(255, 165, 0, 0.1);
-            border: 1px solid rgba(255, 165, 0, 0.3);
-            color: #FFA500;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #ffffff;
             padding: 8px 16px;
             border-radius: 6px;
             cursor: pointer;
@@ -108,18 +98,19 @@
         }
 
         .timer-btn:hover {
-            background: rgba(255, 165, 0, 0.2);
-            border-color: rgba(255, 165, 0, 0.5);
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.3);
         }
 
         .timer-btn.primary {
-            background: linear-gradient(135deg, #FFA500, #FF6B35);
+            background: #FFA500;
             color: #000;
-            border-color: transparent;
+            border-color: #FFA500;
             font-weight: 600;
         }
 
         .timer-btn.primary:hover {
+            background: #FF8C00;
             box-shadow: 0 0 15px rgba(255, 165, 0, 0.3);
         }
 
@@ -128,15 +119,27 @@
             margin-bottom: 20px;
         }
 
+        .section-title {
+            color: #FFA500;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+
+        .task-input-container {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
         .task-input {
-            width: 100%;
+            flex: 1;
             background: rgba(255, 255, 255, 0.05);
             border: 1px solid rgba(255, 255, 255, 0.1);
             color: #fff;
             padding: 12px;
             border-radius: 8px;
             font-size: 14px;
-            margin-bottom: 8px;
         }
 
         .task-input::placeholder {
@@ -145,155 +148,153 @@
 
         .task-input:focus {
             outline: none;
-            border-color: rgba(255, 165, 0, 0.5);
-            box-shadow: 0 0 0 2px rgba(255, 165, 0, 0.1);
+            border-color: rgba(255, 255, 255, 0.3);
         }
 
-        .current-task {
-            background: rgba(255, 165, 0, 0.05);
-            border: 1px solid rgba(255, 165, 0, 0.2);
-            border-radius: 8px;
-            padding: 12px;
-            color: #FFA500;
-            font-size: 13px;
-            margin-bottom: 8px;
-        }
-
-        .current-task.empty {
-            color: #666;
-            border-color: rgba(255, 255, 255, 0.1);
+        .task-btn {
             background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #ffffff;
+            padding: 12px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            white-space: nowrap;
         }
 
-        /* Settings Section */
-        .settings-section {
+        .task-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        /* Duration Settings */
+        .duration-section {
             margin-bottom: 20px;
         }
 
-        .setting-row {
+        .duration-container {
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            margin-bottom: 12px;
+            gap: 12px;
         }
 
-        .setting-label {
+        .duration-label {
             color: #ccc;
-            font-size: 13px;
-        }
-
-        .setting-control {
-            display: flex;
-            align-items: center;
-            gap: 8px;
+            font-size: 14px;
+            min-width: 70px;
         }
 
         .duration-input {
             background: rgba(255, 255, 255, 0.05);
             border: 1px solid rgba(255, 255, 255, 0.1);
             color: #fff;
-            padding: 6px 8px;
-            border-radius: 4px;
-            width: 60px;
+            padding: 8px 12px;
+            border-radius: 6px;
+            width: 80px;
             text-align: center;
-            font-size: 12px;
+            font-size: 14px;
         }
 
-        .mode-switch {
-            background: rgba(255, 165, 0, 0.1);
-            border: 1px solid rgba(255, 165, 0, 0.3);
-            color: #FFA500;
-            padding: 6px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-            transition: all 0.2s ease;
+        .duration-input:focus {
+            outline: none;
+            border-color: rgba(255, 255, 255, 0.3);
         }
 
-        .mode-switch:hover {
-            background: rgba(255, 165, 0, 0.2);
+        .duration-unit {
+            color: #666;
+            font-size: 14px;
         }
 
-        /* Toggle Switches */
-        .controls-section {
+        /* Toggle Cards */
+        .toggles-section {
             margin-bottom: 20px;
         }
 
-        .control-group {
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            padding: 16px;
-            margin-bottom: 12px;
-            transition: all 0.3s ease;
+        .toggles-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
         }
 
-        .control-group:hover {
-            border-color: rgba(255, 165, 0, 0.3);
+        .toggle-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 16px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .toggle-card:hover {
+            border-color: rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .toggle-card.active {
+            border-color: #FFA500;
             background: rgba(255, 165, 0, 0.05);
         }
 
-        .control-header {
+        .toggle-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
             margin-bottom: 8px;
         }
 
-        .control-label {
-            font-size: 16px;
+        .toggle-label {
+            font-size: 14px;
             font-weight: 600;
             color: #ffffff;
         }
 
         .toggle-switch {
-            width: 50px;
-            height: 26px;
+            width: 40px;
+            height: 20px;
             background: rgba(255, 255, 255, 0.1);
-            border-radius: 15px;
+            border-radius: 12px;
             position: relative;
-            cursor: pointer;
             transition: all 0.3s ease;
-            border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
         .toggle-switch.active {
-            background: linear-gradient(135deg, #FFA500, #FF6B35);
-            border-color: #FFA500;
+            background: #FFA500;
         }
 
         .toggle-slider {
-            width: 20px;
-            height: 20px;
+            width: 16px;
+            height: 16px;
             background: #ffffff;
             border-radius: 50%;
             position: absolute;
             top: 2px;
-            left: 3px;
+            left: 2px;
             transition: all 0.3s ease;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
         }
 
         .toggle-switch.active .toggle-slider {
-            transform: translateX(24px);
+            transform: translateX(20px);
             background: #000000;
         }
 
-        .control-description {
-            color: #999;
-            font-size: 12px;
-            margin-bottom: 8px;
+        .toggle-description {
+            color: #888;
+            font-size: 11px;
+            line-height: 1.3;
         }
 
         .status-indicator {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
+            margin-top: 8px;
         }
 
         .status-dot {
-            width: 8px;
-            height: 8px;
+            width: 6px;
+            height: 6px;
             border-radius: 50%;
             background: #666;
             transition: all 0.3s ease;
@@ -301,12 +302,11 @@
 
         .status-dot.active {
             background: #4CAF50;
-            box-shadow: 0 0 8px rgba(76, 175, 80, 0.5);
         }
 
         .status-text {
-            color: #888;
-            font-size: 11px;
+            color: #666;
+            font-size: 10px;
         }
 
         .footer {
@@ -330,40 +330,23 @@
             text-decoration: underline;
         }
 
-        /* Sections */
-        .section-title {
-            color: #FFA500;
-            font-size: 13px;
-            font-weight: 600;
-            margin-bottom: 12px;
-            padding-bottom: 4px;
-            border-bottom: 1px solid rgba(255, 165, 0, 0.2);
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 4px;
         }
 
-        .compact-row {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 8px;
-        }
-
-        .compact-btn {
-            flex: 1;
+        ::-webkit-scrollbar-track {
             background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            color: #ccc;
-            padding: 8px 12px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 11px;
-            text-align: center;
-            transition: all 0.2s ease;
+            border-radius: 2px;
         }
 
-        .compact-btn:hover {
-            border-color: rgba(255, 165, 0, 0.3);
-            color: #FFA500;
+        ::-webkit-scrollbar-thumb {
+            background: #FFA500;
+            border-radius: 2px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #FF8C00;
         }
     </style>
 </head>
@@ -390,49 +373,52 @@
         <!-- Task Management -->
         <div class="task-section">
             <div class="section-title">Current Task</div>
-            <div class="current-task empty" id="currentTask">No task set</div>
-            <input type="text" class="task-input" id="taskInput" placeholder="Set your current task..." maxlength="50">
+            <div class="task-input-container">
+                <input type="text" class="task-input" id="taskInput" placeholder="Set your current task..." maxlength="50">
+                <button class="task-btn" id="taskBtn">Add Task</button>
+            </div>
         </div>
 
-        <!-- Settings -->
-        <div class="settings-section">
-            <div class="section-title">Settings</div>
-            <div class="compact-row">
-                <span class="setting-label">Duration</span>
-                <div class="setting-control">
-                    <input type="number" class="duration-input" id="durationInput" min="1" max="90" value="25">
-                    <span style="color: #666; font-size: 11px;">min</span>
-                </div>
+        <!-- Duration Settings -->
+        <div class="duration-section">
+            <div class="section-title">Duration</div>
+            <div class="duration-container">
+                <span class="duration-label">Timer</span>
+                <input type="number" class="duration-input" id="durationInput" min="1" max="90" value="25">
+                <span class="duration-unit">minutes</span>
             </div>
         </div>
 
         <!-- Feature Toggles -->
-        <div class="controls-section">
-            <div class="control-group">
-                <div class="control-header">
-                    <span class="control-label">Floating Timer</span>
-                    <div class="toggle-switch" id="timerToggle">
-                        <div class="toggle-slider"></div>
+        <div class="toggles-section">
+            <div class="section-title">Controls</div>
+            <div class="toggles-container">
+                <div class="toggle-card" id="timerCard">
+                    <div class="toggle-header">
+                        <span class="toggle-label">Floating Timer</span>
+                        <div class="toggle-switch" id="timerToggle">
+                            <div class="toggle-slider"></div>
+                        </div>
+                    </div>
+                    <div class="toggle-description">Show draggable timer overlay</div>
+                    <div class="status-indicator">
+                        <div class="status-dot" id="timerStatusDot"></div>
+                        <span class="status-text" id="timerStatusText">Checking...</span>
                     </div>
                 </div>
-                <div class="control-description">Show draggable timer on all websites</div>
-                <div class="status-indicator">
-                    <div class="status-dot" id="timerStatus"></div>
-                    <span class="status-text" id="timerStatusText">Checking...</span>
-                </div>
-            </div>
-            
-            <div class="control-group">
-                <div class="control-header">
-                    <span class="control-label">New Tab Override</span>
-                    <div class="toggle-switch" id="newtabToggle">
-                        <div class="toggle-slider"></div>
+                
+                <div class="toggle-card" id="newtabCard">
+                    <div class="toggle-header">
+                        <span class="toggle-label">New Tab Override</span>
+                        <div class="toggle-switch" id="newtabToggle">
+                            <div class="toggle-slider"></div>
+                        </div>
                     </div>
-                </div>
-                <div class="control-description">Replace new tab with focused timer page</div>
-                <div class="status-indicator">
-                    <div class="status-dot" id="newtabStatus"></div>
-                    <span class="status-text" id="newtabStatusText">Checking...</span>
+                    <div class="toggle-description">Replace new tabs with timer</div>
+                    <div class="status-indicator">
+                        <div class="status-dot" id="newtabStatusDot"></div>
+                        <span class="status-text" id="newtabStatusText">Checking...</span>
+                    </div>
                 </div>
             </div>
         </div>

@@ -3,21 +3,38 @@
     - SIDE BAR small 
     - white main ui 
     - timer settin at the top and chagbale using scrooling and entering using text
+
 - ON THE LOGO THERE IS TIMER ALSO ONGOING(in minutes)
+
 - SMOOTHER FUNCITONG OF TIERM 
     - AUTOMATICALLY CONTNIUES AFTER TIMER IS OVER 
     - MAKE SURE IT IS ACCURATE 
+    - WHEN COMMING BACK TO A TAB : REFREST STATUS AUTOMATICALLY 
+    - FORCE SYNC 
+
 - MORE AGGREIVE BLOCKING & REMINDERS 
-- FORCE SYNC 
 - ADD TEXT POPUTS 
 
 : SETTINGS PAGE 
 - RANDOMMIZED SOUND ON OR OFF 
 - CURSOMT SOUND 
 - SOUNDS FREQUENCY 
-
-- WHEN COMMING BACK TO A TAB : REFREST STATUS AUTOMATICALLY 
-
+- QUOTES ON/OFF 
 
 
-FIX THE POPUP UI 
+
+
+
+FIX THE POPUP UI DON'T BREAK THE FUCNTIONLITY 
+- THE ORANGE THEME SHOULD ONLHY BE SHOWN MININALLY (KEEP IT BLACK BG AND WHITE SEONDARY AND THEN ORGNGE OCCALONALY AND IN HEADING)
+- instead of having two filed for current task have one and then next to it have add task change task button (next to it on the right side)
+- under neath that should be cangnge duration ui 
+- under neath that should be flaoting timer off and new tab overrider on or off as card right next to one another card like 
+- the side bar scroll should be small and not ugly and without the soncket and it should eb orage colout off apps theme
+- don't use toto much orange 
+- use icon out of @ for icon usage in the top bar 
+
+
+- when a person comes back to a page after the page has been renderd on pause by the chrome and user makes it active again by clicking or any other way you can detect it refrest the state of the timer as it is stuck at the timer at which the broser paused the page and user needs to refresh the page to start the timer again 
+
+- 

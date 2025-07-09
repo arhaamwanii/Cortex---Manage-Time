@@ -99,17 +99,15 @@ function updateTimerDisplay(state) {
 }
 
 function updateTaskDisplay() {
-    const taskDisplay = document.getElementById('currentTask');
     const taskInput = document.getElementById('taskInput');
+    const taskBtn = document.getElementById('taskBtn');
     
     if (currentTask && currentTask.trim()) {
-        taskDisplay.textContent = currentTask;
-        taskDisplay.className = 'current-task';
         taskInput.value = currentTask;
+        taskBtn.textContent = 'Change Task';
     } else {
-        taskDisplay.textContent = 'No task set';
-        taskDisplay.className = 'current-task empty';
         taskInput.value = '';
+        taskBtn.textContent = 'Add Task';
     }
 }
 
@@ -125,6 +123,16 @@ function setupEventListeners() {
     document.getElementById('timerToggle').addEventListener('click', toggleTimer);
     document.getElementById('newtabToggle').addEventListener('click', toggleNewtab);
     
+    // Toggle cards for easier clicking
+    document.getElementById('timerCard').addEventListener('click', function(e) {
+        if (e.target.closest('.toggle-switch')) return; // Don't double-trigger
+        toggleTimer();
+    });
+    document.getElementById('newtabCard').addEventListener('click', function(e) {
+        if (e.target.closest('.toggle-switch')) return; // Don't double-trigger
+        toggleNewtab();
+    });
+    
     // Timer controls
     document.getElementById('startStopBtn').addEventListener('click', toggleTimerRunning);
     document.getElementById('resetBtn').addEventListener('click', resetTimer);
@@ -132,12 +140,15 @@ function setupEventListeners() {
     
     // Task management
     const taskInput = document.getElementById('taskInput');
+    const taskBtn = document.getElementById('taskBtn');
+    
     taskInput.addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
             setTask();
         }
     });
-    taskInput.addEventListener('blur', setTask);
+    
+    taskBtn.addEventListener('click', setTask);
     
     // Duration setting
     const durationInput = document.getElementById('durationInput');
@@ -185,121 +196,76 @@ function setTask() {
     const taskInput = document.getElementById('taskInput');
     const newTask = taskInput.value.trim();
     
-    if (newTask !== currentTask) {
-        console.log('POPUP.JS: Setting task:', newTask);
-        currentTask = newTask;
-        
-        chrome.runtime.sendMessage({ 
-            action: 'setTask', 
-            task: newTask 
-        }, function(response) {
-            if (chrome.runtime.lastError) {
-                console.error('POPUP.JS: Error setting task:', chrome.runtime.lastError);
-            } else {
-                updateTaskDisplay();
-            }
-        });
-    }
+    console.log('POPUP.JS: Setting task:', newTask);
+    currentTask = newTask;
+    
+    chrome.runtime.sendMessage({ 
+        action: 'setTask', 
+        task: newTask 
+    }, function(response) {
+        if (chrome.runtime.lastError) {
+            console.error('POPUP.JS: Error setting task:', chrome.runtime.lastError);
+        } else {
+            updateTaskDisplay();
+        }
+    });
 }
 
 function setDuration() {
     const durationInput = document.getElementById('durationInput');
     const minutes = parseInt(durationInput.value);
     
-    if (minutes && minutes >= 1 && minutes <= 90) {
-        console.log('POPUP.JS: Setting duration:', minutes, 'minutes');
-        chrome.runtime.sendMessage({ 
-            action: 'updateDuration', 
-            duration: minutes 
-        }, function(response) {
-            if (chrome.runtime.lastError) {
-                console.error('POPUP.JS: Error setting duration:', chrome.runtime.lastError);
-            }
-        });
-    } else {
-        // Reset to current value if invalid
-        if (currentTimerState) {
-            durationInput.value = Math.round(currentTimerState.defaultTime / 60);
-        }
-    }
-}
-
-// Toggle functions (existing functionality)
-function toggleTimer() {
-    if (timerEnabled === null) {
-        console.log('POPUP.JS: Timer state not loaded yet, forcing reload...');
-        loadCurrentState();
+    if (isNaN(minutes) || minutes < 1 || minutes > 90) {
+        console.error('POPUP.JS: Invalid duration:', minutes);
         return;
     }
     
-    const newState = !timerEnabled;
-    console.log('POPUP.JS: Toggling floating timer from', timerEnabled, 'to', newState);
+    console.log('POPUP.JS: Setting duration:', minutes, 'minutes');
+    const seconds = minutes * 60;
     
-    // Show immediate feedback
-    const originalState = timerEnabled;
-    timerEnabled = newState;
-    updateTimerToggle();
+    chrome.runtime.sendMessage({ 
+        action: 'updateDuration', 
+        duration: minutes 
+    }, function(response) {
+        if (chrome.runtime.lastError) {
+            console.error('POPUP.JS: Error setting duration:', chrome.runtime.lastError);
+        }
+    });
+}
+
+function toggleTimer() {
+    console.log('POPUP.JS: Toggling floating timer. Current state:', timerEnabled);
     
-    console.log('POPUP.JS: Sending toggleEnabled message...');
+    const newEnabled = !timerEnabled;
+    console.log('POPUP.JS: Setting floating timer to:', newEnabled);
+    
     chrome.runtime.sendMessage({ 
         action: 'toggleEnabled', 
-        enabled: timerEnabled,
+        enabled: newEnabled,
         source: 'popupToggle'
     }, function(response) {
         if (chrome.runtime.lastError) {
             console.error('POPUP.JS: Error toggling timer:', chrome.runtime.lastError);
-            // Revert on error
-            timerEnabled = originalState;
-            updateTimerToggle();
-            // Try to reconnect
-            setTimeout(() => {
-                console.log('POPUP.JS: Retrying after toggle error...');
-                loadCurrentState();
-            }, 1000);
-            return;
-        }
-        
-        console.log('POPUP.JS: Toggle response:', response);
-        if (response && response.success) {
-            // Update immediately with the response
-            timerEnabled = response.enabled;
+        } else {
+            console.log('POPUP.JS: Timer toggle response:', response);
+            timerEnabled = newEnabled;
             updateTimerToggle();
         }
-        // Also reload state after toggle for completeness
-        setTimeout(loadCurrentState, 300);
     });
 }
 
 function toggleNewtab() {
-    if (newtabEnabled === null) {
-        console.log('POPUP.JS: New tab state not loaded yet, ignoring click');
-        return;
-    }
+    console.log('POPUP.JS: Toggling new tab override. Current state:', newtabEnabled);
     
-    const newState = !newtabEnabled;
-    console.log('POPUP.JS: Toggling new tab from', newtabEnabled, 'to', newState);
+    const newEnabled = !newtabEnabled;
+    console.log('POPUP.JS: Setting new tab override to:', newEnabled);
     
-    // Show immediate feedback
-    const originalState = newtabEnabled;
-    newtabEnabled = newState;
-    updateNewtabToggle();
-    
-    // Only send message to background - let background handle storage
-    chrome.runtime.sendMessage({ 
-        action: 'toggleNewtab', 
-        enabled: newtabEnabled 
-    }, function(response) {
+    chrome.storage.sync.set({ newtabEnabled: newEnabled }, function() {
         if (chrome.runtime.lastError) {
-            console.error('POPUP.JS: Error toggling new tab:', chrome.runtime.lastError);
-            // Revert on error
-            newtabEnabled = originalState;
-            updateNewtabToggle();
-            return;
-        }
-        console.log('POPUP.JS: New tab toggle response:', response);
-        if (response && response.success !== undefined) {
-            // Update with response from background
-            newtabEnabled = response.enabled;
+            console.error('POPUP.JS: Error setting newtab state:', chrome.runtime.lastError);
+        } else {
+            console.log('POPUP.JS: Successfully set newtab state to:', newEnabled);
+            newtabEnabled = newEnabled;
             updateNewtabToggle();
         }
     });
@@ -307,49 +273,48 @@ function toggleNewtab() {
 
 function updateTimerToggle() {
     const toggle = document.getElementById('timerToggle');
-    const status = document.getElementById('timerStatus');
+    const card = document.getElementById('timerCard');
+    const statusDot = document.getElementById('timerStatusDot');
     const statusText = document.getElementById('timerStatusText');
     
-    if (timerEnabled === null) {
-        statusText.textContent = 'Syncing...';
-        return;
-    }
+    console.log('POPUP.JS: Updating timer toggle UI. Enabled:', timerEnabled);
     
     if (timerEnabled) {
         toggle.classList.add('active');
-        status.classList.add('active');
+        card.classList.add('active');
+        statusDot.classList.add('active');
         statusText.textContent = 'Active';
     } else {
         toggle.classList.remove('active');
-        status.classList.remove('active');
+        card.classList.remove('active');
+        statusDot.classList.remove('active');
         statusText.textContent = 'Disabled';
     }
 }
 
 function updateNewtabToggle() {
     const toggle = document.getElementById('newtabToggle');
-    const status = document.getElementById('newtabStatus');
+    const card = document.getElementById('newtabCard');
+    const statusDot = document.getElementById('newtabStatusDot');
     const statusText = document.getElementById('newtabStatusText');
     
-    if (newtabEnabled === null) {
-        statusText.textContent = 'Loading...';
-        return;
-    }
+    console.log('POPUP.JS: Updating newtab toggle UI. Enabled:', newtabEnabled);
     
     if (newtabEnabled) {
         toggle.classList.add('active');
-        status.classList.add('active');
+        card.classList.add('active');
+        statusDot.classList.add('active');
         statusText.textContent = 'Active';
     } else {
         toggle.classList.remove('active');
-        status.classList.remove('active');
+        card.classList.remove('active');
+        statusDot.classList.remove('active');
         statusText.textContent = 'Disabled';
     }
 }
 
-// Force state reset mechanism
+// Emergency function to force state reset
 function forceStateReset() {
-    console.log('POPUP.JS: Requesting force state reset from background');
+    console.log('POPUP.JS: Force resetting all states');
     chrome.runtime.sendMessage({ action: 'forceStateReset' });
-    setTimeout(loadCurrentState, 500);
 } 

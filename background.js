@@ -1,6 +1,144 @@
 // Background script for synchronized timer
 console.log('BACKGROUND: Service worker starting/restarting at', new Date().toISOString());
 
+// NEW TAB REDIRECT LOGIC (instead of chrome_url_overrides)
+// Track tabs that are created for navigation (links, redirects) - these should NOT be redirected
+const navigationTabs = new Set();
+
+// Listen for tabs created specifically for navigation (links, redirects, etc.)
+chrome.webNavigation.onCreatedNavigationTarget.addListener((details) => {
+  console.log('BACKGROUND: Navigation target created:', details);
+  navigationTabs.add(details.tabId);
+  
+  // Clean up after navigation completes or fails
+  setTimeout(() => {
+    navigationTabs.delete(details.tabId);
+  }, 5000); // Clean up after 5 seconds
+});
+
+chrome.tabs.onCreated.addListener((tab) => {
+  console.log('BACKGROUND: New tab created:', {
+    url: tab.url, 
+    id: tab.id, 
+    openerTabId: tab.openerTabId,
+    pendingUrl: tab.pendingUrl
+  });
+  
+  // Check if it's a blank new tab
+  const isBlankTab = tab.url === 'chrome://newtab/' || 
+                     tab.url === 'about:blank' || 
+                     !tab.url || 
+                     tab.url === '' ||
+                     tab.url === 'chrome://new-tab-page/';
+  
+  if (isBlankTab) {
+    // If this tab is marked as a navigation target, DO NOT redirect
+    if (navigationTabs.has(tab.id)) {
+      console.log('BACKGROUND: Tab is navigation target, will not redirect');
+      return;
+    }
+    
+    // Check for pendingUrl which indicates intended navigation
+    if (tab.pendingUrl && tab.pendingUrl !== 'chrome://newtab/' && tab.pendingUrl !== 'about:blank') {
+      console.log('BACKGROUND: Tab has pendingUrl, will not redirect:', tab.pendingUrl);
+      return;
+    }
+    
+    // If tab has opener but no pendingUrl, wait briefly to see if URL loads
+    if (tab.openerTabId) {
+      console.log('BACKGROUND: Tab has opener, checking for URL loading...');
+      setTimeout(() => {
+        // Double-check this isn't a navigation target that was missed
+        if (navigationTabs.has(tab.id)) {
+          console.log('BACKGROUND: Tab became navigation target, not redirecting');
+          return;
+        }
+        
+        chrome.tabs.get(tab.id, (updatedTab) => {
+          if (chrome.runtime.lastError) {
+            return;
+          }
+          
+          // If still blank and not a navigation target, might be a weird edge case - redirect
+          const stillBlank = updatedTab.url === 'chrome://newtab/' || 
+                            updatedTab.url === 'about:blank' || 
+                            !updatedTab.url || 
+                            updatedTab.url === '' ||
+                            updatedTab.url === 'chrome://new-tab-page/';
+          
+          if (stillBlank && !navigationTabs.has(tab.id)) {
+            console.log('BACKGROUND: Tab with opener remained blank, redirecting as fallback');
+            redirectToTimer(tab.id);
+          }
+        });
+      }, 100);
+    } else {
+      // No opener and no pendingUrl = genuine new tab (Ctrl+T, + button) - redirect immediately
+      console.log('BACKGROUND: Genuine new tab (no opener, no pendingUrl), redirecting immediately');
+      redirectToTimer(tab.id);
+    }
+  }
+});
+
+function redirectToTimer(tabId) {
+  chrome.storage.sync.get(['newtabEnabled'], (result) => {
+    if (chrome.runtime.lastError) {
+      console.error('BACKGROUND: Storage error checking newtab state:', chrome.runtime.lastError);
+      return;
+    }
+    
+    const newtabEnabled = result.newtabEnabled !== false; // Default to true
+    
+    if (newtabEnabled) {
+      console.log('BACKGROUND: Redirecting to Elevate timer, tab:', tabId);
+      const extensionUrl = chrome.runtime.getURL('newtab.html');
+      chrome.tabs.update(tabId, { url: extensionUrl }).catch((error) => {
+        console.error('BACKGROUND: Failed to redirect new tab:', error);
+      });
+    } else {
+      console.log('BACKGROUND: Newtab disabled - letting browser handle normally');
+    }
+  });
+}
+
+// Handle direct navigation to our newtab page when disabled
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  // Track when navigation tabs start loading real URLs
+  if (navigationTabs.has(tabId) && changeInfo.url) {
+    const url = changeInfo.url;
+    if (url !== 'chrome://newtab/' && 
+        url !== 'about:blank' && 
+        url !== '' && 
+        url !== 'chrome://new-tab-page/' &&
+        !url.includes('newtab.html')) {
+      console.log('BACKGROUND: Navigation tab loading real URL:', url);
+      // Keep it in navigationTabs to prevent any future redirect attempts
+    }
+  }
+  
+  // Only check when the page is loading our newtab.html
+  if (changeInfo.status === 'loading' && tab.url && tab.url.includes('newtab.html')) {
+    chrome.storage.sync.get(['newtabEnabled'], (result) => {
+      const newtabEnabled = result.newtabEnabled !== false; // Default to true
+      
+      if (!newtabEnabled) {
+        console.log('BACKGROUND: Newtab accessed while disabled - redirecting to chrome://newtab/');
+        chrome.tabs.update(tabId, { url: 'chrome://newtab/' }).catch((error) => {
+          console.error('BACKGROUND: Failed to redirect disabled newtab:', error);
+        });
+      }
+    });
+  }
+});
+
+// Clean up navigation tabs when they're closed
+chrome.tabs.onRemoved.addListener((tabId) => {
+  if (navigationTabs.has(tabId)) {
+    console.log('BACKGROUND: Cleaning up closed navigation tab:', tabId);
+    navigationTabs.delete(tabId);
+  }
+});
+
 let globalTimer = {
   timeLeft: 25 * 60,
   isRunning: false,
@@ -41,8 +179,8 @@ setInterval(() => {
   console.log('BACKGROUND: Service worker keepalive ping');
 }, 20000);
 
-// NEW TAB FUNCTIONALITY: Now handled via chrome_url_overrides in manifest
-// The newtab.html will automatically load, and can check newtabEnabled state internally
+// NEW TAB FUNCTIONALITY: Now handled via background redirect (no chrome_url_overrides permission needed)
+// When a new tab is created, we redirect to our extension page if newtabEnabled=true
 
 // STATE RESET: Initialize timer from storage with forced synchronization
 chrome.storage.sync.get(['timerState', 'timerDuration', 'timerEnabled', 'timerVisible', 'stopwatchState', 'newtabEnabled'], function(result) {
@@ -133,10 +271,8 @@ function startGlobalTimer() {
     globalTimer.interval = setInterval(() => {
       globalTimer.timeLeft--;
       
-      // Broadcast to all tabs every 5 seconds instead of every second
-      if (globalTimer.timeLeft % 5 === 0 || globalTimer.timeLeft <= 10) {
-        broadcastTimerUpdate();
-      }
+      // Broadcast to all tabs every second for real-time updates
+      broadcastTimerUpdate();
       
       // Only save state every 60 seconds instead of every second, or when timer completes/low
       if (globalTimer.timeLeft % 60 === 0 || globalTimer.timeLeft <= 0 || globalTimer.timeLeft <= 5) {
@@ -160,10 +296,8 @@ function startGlobalTimer() {
     globalTimer.interval = setInterval(() => {
       globalTimer.timeLeft++; // Counting up
       
-      // Less frequent broadcasting for stopwatch too
-      if (globalTimer.timeLeft % 5 === 0) {
-        broadcastTimerUpdate();
-      }
+      // Broadcast stopwatch updates every second for real-time updates
+      broadcastTimerUpdate();
       
       // Save every 60 seconds for stopwatch
       if (globalTimer.timeLeft % 60 === 0) {
@@ -274,10 +408,8 @@ function startStopwatch() {
   stopwatch.isRunning = true;
   stopwatch.interval = setInterval(() => {
     stopwatch.time++;
-    // Less frequent broadcasting for stopwatch
-    if (stopwatch.time % 5 === 0) {
-      broadcastTimerUpdate();
-    }
+    // Broadcast stopwatch updates every second for real-time updates
+    broadcastTimerUpdate();
     // Save every 60 seconds for stopwatch
     if (stopwatch.time % 60 === 0) {
       debouncedSaveTimerState();
@@ -427,16 +559,14 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
       
     case 'setTask':
       console.log('BACKGROUND: Setting task to:', request.task);
-      if (!globalTimer.isRunning) {
-        globalTimer.currentTask = request.task;
-        if (globalTimer.currentTask) {
-            startTaskReminder();
-        } else {
-            stopTaskReminder();
-        }
-        debouncedSaveTimerState();
-        broadcastTimerUpdate();
+      globalTimer.currentTask = request.task;
+      if (globalTimer.currentTask) {
+          startTaskReminder();
+      } else {
+          stopTaskReminder();
       }
+      debouncedSaveTimerState();
+      broadcastTimerUpdate();
       sendResponse({ success: true, task: globalTimer.currentTask });
       break;
       
@@ -505,14 +635,14 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
         break;
         
     case 'toggleNewtab':
-      console.log('BACKGROUND: Toggling new tab to:', request.enabled);
+      console.log('BACKGROUND: Toggling new tab redirect to:', request.enabled);
       // Handle new tab toggle with proper error handling
       chrome.storage.sync.set({ newtabEnabled: request.enabled }, function() {
         if (chrome.runtime.lastError) {
           console.error('BACKGROUND: Error saving newtab state:', chrome.runtime.lastError);
           sendResponse({ success: false, error: chrome.runtime.lastError.message });
         } else {
-          console.log('BACKGROUND: Newtab state saved successfully:', request.enabled);
+          console.log('BACKGROUND: Newtab redirect state saved successfully:', request.enabled);
           sendResponse({ success: true, enabled: request.enabled });
         }
       });

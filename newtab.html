@@ -19,17 +19,100 @@
             align-items: center;
         }
         
-        /* Timer positioning for new tab */
+        /* Timer positioning for new tab - fixed in center (not draggable) */
         .pomodoro-timer {
-            position: relative !important;
-            top: auto !important;
-            left: auto !important;
-            right: auto !important;
-            bottom: auto !important;
-            transform: none !important;
-            margin: 0 auto;
+            position: absolute !important;
             z-index: 1000;
+            /* Fixed in center */
+            left: 50% !important;
+            top: 50% !important;
+            transform: translate(-50%, -50%) !important;
+            margin: 0;
+            /* No dragging - fixed position */
+            cursor: default;
+            
+            /* Scale to 1.4x for main timer with smaller controls */
+            padding: 42px 28px 28px 28px !important;  /* 1.4x of original 30px 20px 20px 20px */
+            font-size: 34px !important;  /* 1.4x of original 24px */
+            min-width: 196px !important;  /* 1.4x of original 140px */
+            max-width: 280px !important;  /* Prevent it from getting too wide */
         }
+        
+        /* Scale up the timer display to 1.4x */
+        .pomodoro-timer .timer-display {
+            font-size: 45px !important;  /* 1.4x of original 32px */
+            margin-bottom: 14px !important;  /* 1.4x of original 10px */
+            margin-top: -14px !important;  /* 1.4x of original -10px */
+            letter-spacing: 3px !important;  /* 1.4x of original 2px */
+        }
+        
+        /* Scale controls to 1.2x (smaller than main timer) */
+        .pomodoro-timer .timer-controls {
+            /* Hidden by default, shown on hover (like floating timer) */
+            display: none !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            width: 100% !important;
+        }
+        
+        /* Show controls on hover (just like floating timer) */
+        .pomodoro-timer:hover .timer-controls {
+            display: flex !important;
+        }
+        
+        .pomodoro-timer .timer-controls button {
+            padding: 12px 22px !important;  /* 1.2x of original 10px 18px */
+            font-size: 19px !important;  /* 1.2x of original 16px */
+            margin: 2px 0 !important;  /* 45% less spacing between buttons (was 4px) */
+            width: 90% !important;  /* Make buttons consistent width but not full width */
+            max-width: 180px !important;  /* Prevent buttons from getting too wide */
+        }
+        
+        /* Scale up task display to 1.3x (between controls and main timer) */
+        .pomodoro-timer .task-display {
+            font-size: 21px !important;  /* 1.3x of original 16px */
+            margin-top: 20px !important;  /* 1.3x of original 15px */
+            max-width: 32ch !important;  /* 1.3x of original 25ch */
+            text-align: center !important;  /* Center the task text */
+        }
+        
+        /* Scale frequency controls to 1.2x (same as buttons) */
+        .pomodoro-timer .freq-controls {
+            margin-top: 15px !important;  /* 1.2x of original 12px */
+            justify-content: center !important;  /* Center the frequency controls */
+        }
+        
+        .pomodoro-timer .freq-label {
+            font-size: 16px !important;  /* 1.2x of original 13px */
+        }
+        
+        .pomodoro-timer .arrow-btn {
+            width: 26px !important;  /* 1.2x of original 22px */
+            height: 26px !important;  /* 1.2x of original 22px */
+            font-size: 22px !important;  /* 1.2x of original 18px */
+        }
+        
+        .pomodoro-timer #freq-value {
+            font-size: 16px !important;  /* Match freq-label size */
+        }
+        
+        /* Hide close button on new tab (not needed since it's the new tab page) */
+        .pomodoro-timer .close-btn {
+            display: none !important;
+        }
+        
+        /* Dragging state cursor */
+        .pomodoro-timer:active {
+            cursor: grabbing;
+        }
+        
+        /* Keep timer stable during hover - allow normal scaling */
+        .pomodoro-timer:hover {
+            /* Allow normal hover effects from timer.css but don't override our sizing */
+        }
+        
+        /* Keep original hover behavior from floating timer */
+        /* Controls hidden by default, shown on hover just like floating timer */
         
         /* Search suggestion at bottom */
         .search-suggestion {
@@ -48,39 +131,7 @@
             opacity: 1;
         }
         
-        /* Disabled state message */
-        .disabled-message {
-            text-align: center;
-            color: #ffffff;
-            display: none;
-        }
-        
-        .disabled-message h2 {
-            color: #FFA500;
-            margin-bottom: 15px;
-        }
-        
-        .disabled-message p {
-            color: #aaaaaa;
-            margin-bottom: 20px;
-        }
-        
-        .enable-button {
-            background: linear-gradient(135deg, #FFA500, #FF6B35);
-            border: none;
-            color: white;
-            padding: 12px 24px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
-            transition: all 0.3s ease;
-        }
-        
-        .enable-button:hover {
-            box-shadow: 0 0 15px rgba(255, 165, 0, 0.4);
-            transform: translateY(-2px);
-        }
+
         
         /* Loading message */
         .loading-message {
@@ -108,19 +159,13 @@
         <!-- Timer will be created here -->
     </div>
     
-    <!-- Disabled state message -->
-    <div class="disabled-message" id="disabledMessage">
-        <h2>Elevate New Tab</h2>
-        <p>New tab override is currently disabled.</p>
-        <p style="color: #666; font-size: 12px;">Enable the new tab setting in the extension popup to show the timer.</p>
-        <button class="enable-button" onclick="enableNewtab()">Enable Timer</button>
-    </div>
+
     
     <!-- Error state message -->
     <div class="error-message" id="errorMessage">
         <h2 style="color: #ff6b6b;">Error Loading Timer</h2>
         <p style="color: #aaaaaa;">Something went wrong while initializing the timer.</p>
-        <button class="enable-button" onclick="location.reload()">Reload</button>
+        <button style="background: linear-gradient(135deg, #FFA500, #FF6B35); border: none; color: white; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600;" onclick="location.reload()">Reload</button>
     </div>
     
     <!-- Search suggestion at bottom -->
@@ -128,579 +173,7 @@
         Use the URL bar to search for stuff
     </div>
     
-    <script>
-        // COMPREHENSIVE DEBUGGING AND INITIALIZATION SYSTEM
-        console.log('NEWTAB: ==========================================');
-        console.log('NEWTAB: Starting page initialization...');
-        console.log('NEWTAB: URL:', window.location.href);
-        console.log('NEWTAB: Timestamp:', new Date().toISOString());
-        
-        // Global state management
-        let timerData = {
-            timeLeft: 25 * 60,
-            isRunning: false,
-            mode: 'pomodoro',
-            currentTask: '',
-            defaultTime: 25 * 60
-        };
-        
-        // DOM elements
-        const loadingMessage = document.getElementById('loadingMessage');
-        const disabledMessage = document.getElementById('disabledMessage');
-        const errorMessage = document.getElementById('errorMessage');
-        const timerContainer = document.getElementById('timerContainer');
-        
-        // Initialization tracking
-        let initializationState = {
-            chromeAPIsAvailable: false,
-            backgroundConnected: false,
-            storageAccessible: false,
-            newtabEnabled: null,
-            timerCreated: false,
-            initComplete: false
-        };
-        
-        // Debug logging function
-        function debugLog(message, data = null) {
-            const timestamp = new Date().toISOString().split('T')[1].slice(0, -1);
-            console.log(`NEWTAB[${timestamp}]: ${message}`, data || '');
-        }
-        
-        // Error tracking
-        let errorLog = [];
-        function logError(message, error = null) {
-            const errorEntry = {
-                timestamp: new Date().toISOString(),
-                message: message,
-                error: error ? error.toString() : null
-            };
-            errorLog.push(errorEntry);
-            console.error(`NEWTAB ERROR: ${message}`, error);
-        }
-        
-        // UI State Management
-        function hideAllMessages() {
-            loadingMessage.style.display = 'none';
-            disabledMessage.style.display = 'none';
-            errorMessage.style.display = 'none';
-            timerContainer.style.display = 'none';
-        }
-        
-        function showLoading(message = null) {
-            hideAllMessages();
-            loadingMessage.style.display = 'block';
-            if (message) {
-                const p = loadingMessage.querySelector('p');
-                if (p) p.textContent = message;
-            }
-        }
-        
-        function showDisabled() {
-            hideAllMessages();
-            disabledMessage.style.display = 'block';
-            debugLog('Showing disabled state - newtab is turned off');
-        }
-        
-        function showError(message) {
-            hideAllMessages();
-            errorMessage.style.display = 'block';
-            const p = errorMessage.querySelector('p');
-            if (p) p.textContent = message;
-            debugLog('Showing error state:', message);
-        }
-        
-        function showTimer() {
-            hideAllMessages();
-            timerContainer.style.display = 'block';
-            initializationState.initComplete = true;
-            debugLog('Timer displayed successfully');
-        }
-        
-        // Chrome API Validation
-        function validateChromeAPIs() {
-            debugLog('Validating Chrome APIs...');
-            
-            if (typeof chrome === 'undefined') {
-                logError('Chrome object not available');
-                return false;
-            }
-            
-            if (!chrome.runtime) {
-                logError('Chrome runtime API not available');
-                return false;
-            }
-            
-            if (!chrome.storage) {
-                logError('Chrome storage API not available');
-                return false;
-            }
-            
-            if (!chrome.runtime.id) {
-                logError('Extension ID not available');
-                return false;
-            }
-            
-            initializationState.chromeAPIsAvailable = true;
-            debugLog('Chrome APIs validated successfully', {
-                extensionId: chrome.runtime.id,
-                runtime: !!chrome.runtime,
-                storage: !!chrome.storage
-            });
-            return true;
-        }
-        
-        // Background Script Connection Test
-        function testBackgroundConnection() {
-            return new Promise((resolve) => {
-                debugLog('Testing background script connection...');
-                
-                const timeout = setTimeout(() => {
-                    logError('Background script ping timeout');
-                    resolve(false);
-                }, 3000);
-                
-                chrome.runtime.sendMessage({ action: 'ping' }, (response) => {
-                    clearTimeout(timeout);
-                    
-                    if (chrome.runtime.lastError) {
-                        logError('Background script connection failed', chrome.runtime.lastError);
-                        resolve(false);
-                        return;
-                    }
-                    
-                    initializationState.backgroundConnected = true;
-                    debugLog('Background script connected successfully', response);
-                    resolve(true);
-                });
-            });
-        }
-        
-        // Storage Access Test
-        function testStorageAccess() {
-            return new Promise((resolve) => {
-                debugLog('Testing storage access...');
-                
-                chrome.storage.sync.get(['newtabEnabled'], (result) => {
-                    if (chrome.runtime.lastError) {
-                        logError('Storage access failed', chrome.runtime.lastError);
-                        resolve(false);
-                        return;
-                    }
-                    
-                    initializationState.storageAccessible = true;
-                    initializationState.newtabEnabled = result.newtabEnabled;
-                    debugLog('Storage access successful', result);
-                    resolve(true);
-                });
-            });
-        }
-        
-        // Timer Creation with Enhanced Error Handling
-        function createTimer() {
-            debugLog('Creating timer element...');
-            
-            try {
-                // Remove any existing timer
-                const existingTimer = document.getElementById('pomodoro-timer');
-                if (existingTimer) {
-                    debugLog('Removing existing timer element');
-                    existingTimer.remove();
-                }
-                
-                // Validate container
-                if (!timerContainer) {
-                    throw new Error('Timer container not found in DOM');
-                }
-                
-                // Create timer element
-                const timer = document.createElement('div');
-                timer.className = 'pomodoro-timer';
-                timer.id = 'pomodoro-timer';
-                
-                // Format time safely
-                let timeDisplay = '25:00';
-                try {
-                    timeDisplay = formatTime(timerData.timeLeft);
-                } catch (timeError) {
-                    logError('Time formatting failed, using default', timeError);
-                }
-                
-                const modeDisplay = (timerData.mode || 'pomodoro').toUpperCase();
-                const isRunning = timerData.isRunning || false;
-                const currentTask = timerData.currentTask || '';
-                
-                timer.innerHTML = `
-                    <div class="timer-header">
-                        <button id="modeButton" class="mode-button">${modeDisplay}</button>
-                        <button id="hideButton" class="hide-button" title="Hide Timer" style="margin-left: 10px; padding: 5px 8px; border: 1px solid #444; background: #1a1a1a; color: #888; border-radius: 4px; cursor: pointer;">−</button>
-                    </div>
-                    <div class="timer-display">
-                        <div class="time-display" id="timeDisplay">${timeDisplay}</div>
-                    </div>
-                    <div class="timer-controls">
-                        <button id="startButton" class="start-button">${isRunning ? 'Pause' : 'Start'}</button>
-                        <button id="resetButton" class="reset-button">Reset</button>
-                    </div>
-                    <div class="task-section">
-                        <input type="text" id="taskInput" class="task-input" placeholder="What are you working on?" value="${currentTask}" maxlength="100">
-                    </div>
-                `;
-                
-                // Add to container
-                timerContainer.appendChild(timer);
-                
-                // Set up event listeners
-                setupTimerEventListeners();
-                
-                initializationState.timerCreated = true;
-                debugLog('Timer element created successfully');
-                return true;
-                
-            } catch (error) {
-                logError('Timer creation failed', error);
-                return false;
-            }
-        }
-        
-        // Event Listeners Setup
-        function setupTimerEventListeners() {
-            debugLog('Setting up timer event listeners...');
-            
-            try {
-                const startButton = document.getElementById('startButton');
-                const resetButton = document.getElementById('resetButton');
-                const modeButton = document.getElementById('modeButton');
-                const taskInput = document.getElementById('taskInput');
-                const hideButton = document.getElementById('hideButton');
-                
-                if (startButton) {
-                    startButton.addEventListener('click', toggleTimer);
-                }
-                
-                if (resetButton) {
-                    resetButton.addEventListener('click', resetTimer);
-                }
-                
-                if (modeButton) {
-                    modeButton.addEventListener('click', switchMode);
-                }
-                
-                if (taskInput) {
-                    taskInput.addEventListener('blur', updateTask);
-                    taskInput.addEventListener('keypress', (e) => {
-                        if (e.key === 'Enter') {
-                            taskInput.blur();
-                        }
-                    });
-                }
-                
-                if (hideButton) {
-                    hideButton.addEventListener('click', () => {
-                        debugLog('Hide button clicked - reloading page to return to chrome://newtab/');
-                        window.location.href = 'chrome://newtab/';
-                    });
-                }
-                
-                debugLog('Event listeners set up successfully');
-                
-            } catch (error) {
-                logError('Failed to set up event listeners', error);
-            }
-        }
-        
-        // Timer Functions
-        function toggleTimer() {
-            debugLog('Toggle timer called');
-            chrome.runtime.sendMessage({ action: 'toggleTimer' }, (response) => {
-                if (chrome.runtime.lastError) {
-                    logError('Toggle timer failed', chrome.runtime.lastError);
-                    return;
-                }
-                debugLog('Toggle timer response', response);
-            });
-        }
-        
-        function resetTimer() {
-            debugLog('Reset timer called');
-            chrome.runtime.sendMessage({ action: 'resetTimer' }, (response) => {
-                if (chrome.runtime.lastError) {
-                    logError('Reset timer failed', chrome.runtime.lastError);
-                    return;
-                }
-                debugLog('Reset timer response', response);
-            });
-        }
-        
-        function switchMode() {
-            debugLog('Switch mode called');
-            chrome.runtime.sendMessage({ action: 'switchMode' }, (response) => {
-                if (chrome.runtime.lastError) {
-                    logError('Switch mode failed', chrome.runtime.lastError);
-                    return;
-                }
-                debugLog('Switch mode response', response);
-            });
-        }
-        
-        function updateTask() {
-            const taskInput = document.getElementById('taskInput');
-            if (taskInput && taskInput.value !== timerData.currentTask) {
-                timerData.currentTask = taskInput.value;
-                debugLog('Updating task', taskInput.value);
-                chrome.runtime.sendMessage({
-                    action: 'setTask',
-                    task: timerData.currentTask
-                }, (response) => {
-                    if (chrome.runtime.lastError) {
-                        logError('Task update failed', chrome.runtime.lastError);
-                        return;
-                    }
-                    debugLog('Task updated successfully');
-                });
-            }
-        }
-        
-        function requestTimerState() {
-            debugLog('Requesting timer state from background...');
-            chrome.runtime.sendMessage({ action: 'getTimerState' }, (response) => {
-                if (chrome.runtime.lastError) {
-                    logError('Failed to get timer state', chrome.runtime.lastError);
-                    return;
-                }
-                
-                if (response) {
-                    debugLog('Received timer state', response);
-                    timerData.timeLeft = response.timeLeft;
-                    timerData.isRunning = response.isRunning;
-                    timerData.mode = response.mode || 'pomodoro';
-                    timerData.currentTask = response.currentTask || '';
-                    timerData.defaultTime = response.defaultTime;
-                    updateDisplay();
-                    updateModeButton();
-                } else {
-                    debugLog('No timer state response from background');
-                }
-            });
-        }
-        
-        // Display Update Functions
-        function updateDisplay() {
-            const timeDisplay = document.getElementById('timeDisplay');
-            const startButton = document.getElementById('startButton');
-            
-            if (timeDisplay) {
-                timeDisplay.textContent = formatTime(timerData.timeLeft);
-            }
-            
-            if (startButton) {
-                startButton.textContent = timerData.isRunning ? 'Pause' : 'Start';
-            }
-        }
-        
-        function updateModeButton() {
-            const modeButton = document.getElementById('modeButton');
-            if (modeButton) {
-                modeButton.textContent = (timerData.mode || 'pomodoro').toUpperCase();
-            }
-        }
-        
-        function formatTime(seconds) {
-            const mins = Math.floor(seconds / 60);
-            const secs = seconds % 60;
-            return `${mins}:${secs.toString().padStart(2, '0')}`;
-        }
-        
-        // Message Listener for updates from background
-        chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-            debugLog('Received message from background', request.action);
-            
-            if (request.action === 'updateTimerDisplay') {
-                timerData.timeLeft = request.timeLeft;
-                timerData.isRunning = request.isRunning;
-                timerData.mode = request.mode || 'pomodoro';
-                timerData.currentTask = request.currentTask || '';
-                updateDisplay();
-                updateModeButton();
-                debugLog('Timer display updated from background');
-            }
-        });
-        
-        // Enable Newtab Function
-        function enableNewtab() {
-            debugLog('Enabling new tab functionality...');
-            showLoading('Enabling new tab timer...');
-            
-            chrome.storage.sync.set({ newtabEnabled: true }, () => {
-                if (chrome.runtime.lastError) {
-                    logError('Failed to save newtab state', chrome.runtime.lastError);
-                    showError('Failed to save settings');
-                    return;
-                }
-                
-                chrome.runtime.sendMessage({ action: 'toggleNewtab', enabled: true }, (response) => {
-                    if (chrome.runtime.lastError) {
-                        logError('Failed to toggle newtab', chrome.runtime.lastError);
-                        showError('Failed to toggle new tab');
-                        return;
-                    }
-                    debugLog('Newtab enabled, reloading page...');
-                    location.reload();
-                });
-            });
-        }
-        
-        // COMPREHENSIVE INITIALIZATION SYSTEM
-        async function initializeTimer() {
-            debugLog('=== STARTING COMPREHENSIVE INITIALIZATION ===');
-            
-            try {
-                // Step 1: Validate Chrome APIs
-                showLoading('Validating Chrome APIs...');
-                if (!validateChromeAPIs()) {
-                    showError('Chrome extension APIs not available. Please reload the extension.');
-                    return;
-                }
-                
-                // Step 2: Test Background Connection
-                showLoading('Connecting to background script...');
-                const backgroundConnected = await testBackgroundConnection();
-                if (!backgroundConnected) {
-                    debugLog('Background connection failed, but continuing...');
-                    // Don't fail here - might work later
-                }
-                
-                // Step 3: Test Storage Access
-                showLoading('Checking storage access...');
-                const storageAccessible = await testStorageAccess();
-                if (!storageAccessible) {
-                    showError('Storage access failed. Please check extension permissions.');
-                    return;
-                }
-                
-                // Step 4: Check if newtab is enabled
-                debugLog('Checking newtab enabled status...');
-                const newtabEnabled = initializationState.newtabEnabled === true;
-                debugLog('Newtab enabled:', newtabEnabled, 'raw value:', initializationState.newtabEnabled);
-                
-                if (!newtabEnabled) {
-                    showDisabled();
-                    return;
-                }
-                
-                // Step 5: Create Timer
-                showLoading('Creating timer interface...');
-                const timerCreated = createTimer();
-                if (!timerCreated) {
-                    showError('Failed to create timer interface');
-                    return;
-                }
-                
-                // Step 6: Request State and Show Timer
-                showLoading('Loading timer state...');
-                requestTimerState();
-                
-                // Step 7: Success
-                setTimeout(() => {
-                    showTimer();
-                    debugLog('=== INITIALIZATION COMPLETED SUCCESSFULLY ===');
-                }, 500);
-                
-            } catch (error) {
-                logError('Initialization failed with error', error);
-                showError('Initialization failed: ' + error.message);
-            }
-        }
-        
-        // Emergency Fallback System
-        function emergencyFallback() {
-            debugLog('=== EMERGENCY FALLBACK ACTIVATED ===');
-            
-            try {
-                // Force timer creation with minimal dependencies
-                if (!initializationState.timerCreated) {
-                    createTimer();
-                }
-                showTimer();
-                debugLog('Emergency fallback successful');
-                
-                // Try to request state after showing timer
-                setTimeout(() => {
-                    if (initializationState.chromeAPIsAvailable) {
-                        requestTimerState();
-                    }
-                }, 1000);
-                
-            } catch (error) {
-                logError('Emergency fallback failed', error);
-                showError('Complete initialization failure. Please reload the extension.');
-            }
-        }
-        
-        // Debug Function for Troubleshooting
-        window.debugNewtab = function() {
-            console.log('=== NEWTAB DEBUG INFORMATION ===');
-            console.log('Initialization State:', initializationState);
-            console.log('Timer Data:', timerData);
-            console.log('Error Log:', errorLog);
-            console.log('DOM Elements:', {
-                timerContainer: !!timerContainer,
-                loadingMessage: !!loadingMessage,
-                timerElement: !!document.getElementById('pomodoro-timer')
-            });
-            console.log('Chrome APIs:', {
-                chrome: typeof chrome,
-                runtime: typeof chrome?.runtime,
-                storage: typeof chrome?.storage,
-                extensionId: chrome?.runtime?.id
-            });
-            console.log('================================');
-        };
-        
-        // Update search suggestion with platform-specific shortcut
-        function updateSearchSuggestion() {
-            const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-            const shortcut = isMac ? 'Cmd+L' : 'Ctrl+L';
-            const searchSuggestion = document.getElementById('searchSuggestion');
-            if (searchSuggestion) {
-                searchSuggestion.textContent = `Use the URL bar to search or press ${shortcut} to jump to URL bar`;
-            }
-        }
-        
-        // MAIN ENTRY POINTS
-        function startInitialization() {
-            debugLog('Starting initialization...');
-            updateSearchSuggestion();
-            
-            // Start main initialization
-            initializeTimer();
-            
-            // Set emergency fallback
-            setTimeout(() => {
-                if (!initializationState.initComplete) {
-                    debugLog('Main initialization timed out, activating emergency fallback...');
-                    emergencyFallback();
-                }
-            }, 8000); // 8 second timeout
-        }
-        
-        // Initialize when DOM is ready
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', startInitialization);
-        } else {
-            startInitialization();
-        }
-        
-        // Additional fallback when window loads
-        window.addEventListener('load', () => {
-            setTimeout(() => {
-                if (!initializationState.initComplete) {
-                    debugLog('Window load fallback triggered...');
-                    emergencyFallback();
-                }
-            }, 2000);
-        });
-        
-        debugLog('Script setup complete, waiting for DOM...');
-    </script>
+    <!-- External JavaScript files to avoid CSP issues -->
+    <script src="newtab-main.js"></script>
 </body>
 </html>
