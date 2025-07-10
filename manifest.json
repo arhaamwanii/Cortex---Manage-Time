@@ -11,6 +11,9 @@
     "webNavigation",
     "notifications"
   ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"
   },
