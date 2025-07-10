@@ -12,34 +12,34 @@
         }
 
         html, body {
-            scrollbar-width: thin; /* Firefox - allow thin scrollbar */
-            -ms-overflow-style: auto; /* IE/Edge - allow scrollbar */
+            scrollbar-width: none; /* Firefox - hide scrollbar */
+            -ms-overflow-style: none; /* IE/Edge - hide scrollbar */
         }
 
-        /* Webkit browsers - style scrollbar */
+        /* Webkit browsers - make scrollbar almost invisible */
         html::-webkit-scrollbar,
         body::-webkit-scrollbar,
         .container::-webkit-scrollbar {
-            width: 4px;
+            width: 1px;
         }
 
         html::-webkit-scrollbar-track,
         body::-webkit-scrollbar-track,
         .container::-webkit-scrollbar-track {
-            background: #111;
+            background: transparent;
         }
 
         html::-webkit-scrollbar-thumb,
         body::-webkit-scrollbar-thumb,
         .container::-webkit-scrollbar-thumb {
-            background: #444;
-            border-radius: 2px;
+            background: #111;
+            border-radius: 0px;
         }
 
         html::-webkit-scrollbar-thumb:hover,
         body::-webkit-scrollbar-thumb:hover,
         .container::-webkit-scrollbar-thumb:hover {
-            background: #666;
+            background: #222;
         }
 
         body {
@@ -248,7 +248,7 @@
         }
 
         .section-title {
-            color: #FFA500;
+            color: #ffffff !important;
             font-size: 13px;
             font-weight: 600;
             margin-bottom: 12px;
@@ -635,7 +635,7 @@
         .reminder-status {
             font-size: 12px;
             font-weight: 600;
-            color: #ffffff;
+            color: #ffffff !important;
         }
 
         .reminder-status.inactive {
@@ -689,7 +689,7 @@
         .control-label {
             font-size: 12px;
             font-weight: 600;
-            color: #ffffff;
+            color: #ffffff !important;
         }
 
         .volume-control {
@@ -1018,7 +1018,7 @@
                 <div class="reminder-info">
                     <span class="reminder-status" id="reminderStatus">Active</span>
                     <div class="reminder-preview">
-                        <span class="sound-icon">🔔</span>
+
                         <span class="reminder-preview-text" id="reminderPreviewText">Every 2 min</span>
                     </div>
                 </div>

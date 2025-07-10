@@ -272,6 +272,9 @@ chrome.storage.sync.get(['timerState', 'timerDuration', 'timerEnabled', 'timerVi
     console.log('BACKGROUND: Force broadcasting initial state to sync all components');
     forceSyncAllTabs();
   }, 500);
+  
+  // Initialize standalone audio reminder system after timer initialization
+  initializeAudioReminderSystem();
 });
 
 // Initialize website blocker from storage
@@ -304,6 +307,241 @@ chrome.storage.local.get(['websiteBlockerSettings'], function(result) {
   setupWebsiteBlockingListeners();
   console.log('BACKGROUND: Website blocking listeners setup complete');
 });
+
+// =====================================
+// STANDALONE AUDIO REMINDER SYSTEM
+// =====================================
+
+// Completely standalone audio reminder state - NOT tied to timer
+let audioReminderSystem = {
+  enabled: true,
+  frequency: 2, // minutes
+  volume: 0.5,
+  customSound: null,
+  intervalId: null
+};
+
+// Initialize standalone audio reminder system from storage
+function initializeAudioReminderSystem() {
+  chrome.storage.sync.get(['audioReminderSystem'], function(result) {
+    if (result.audioReminderSystem) {
+      audioReminderSystem = { ...audioReminderSystem, ...result.audioReminderSystem };
+      console.log('BACKGROUND: 🔊 Loaded standalone audio reminder settings:', audioReminderSystem);
+    }
+    
+    // Start audio reminders if enabled and frequency > 0
+    if (audioReminderSystem.enabled && audioReminderSystem.frequency > 0) {
+      startStandaloneAudioReminders();
+    }
+  });
+}
+
+// Start the standalone audio reminder system
+function startStandaloneAudioReminders() {
+  console.log('BACKGROUND: 🔊 Starting standalone audio reminders');
+  stopStandaloneAudioReminders(); // Stop any existing reminders
+  
+  if (!audioReminderSystem.enabled || audioReminderSystem.frequency === 0) {
+    console.log('BACKGROUND: 🔊 Audio reminders disabled or frequency is 0');
+    return;
+  }
+  
+  const intervalMs = audioReminderSystem.frequency * 60 * 1000; // Convert minutes to milliseconds
+  console.log('BACKGROUND: 🔊 Starting audio reminders every', audioReminderSystem.frequency, 'minutes (', intervalMs, 'ms)');
+  
+  audioReminderSystem.intervalId = setInterval(() => {
+    console.log('BACKGROUND: 🔔 STANDALONE AUDIO REMINDER FIRING!');
+    fireStandaloneAudioReminder();
+  }, intervalMs);
+  
+  console.log('BACKGROUND: 🔊 Standalone audio reminder interval established with ID:', audioReminderSystem.intervalId);
+}
+
+// Stop the standalone audio reminder system
+function stopStandaloneAudioReminders() {
+  if (audioReminderSystem.intervalId) {
+    console.log('BACKGROUND: 🔊 Stopping standalone audio reminders, interval ID:', audioReminderSystem.intervalId);
+    clearInterval(audioReminderSystem.intervalId);
+    audioReminderSystem.intervalId = null;
+    console.log('BACKGROUND: 🔊 Standalone audio reminders stopped');
+  }
+}
+
+// Fire a standalone audio reminder
+function fireStandaloneAudioReminder() {
+  console.log('BACKGROUND: 🔔 Firing standalone audio reminder');
+  
+  // First try to find the active tab
+  chrome.tabs.query({ active: true, currentWindow: true }, function(activeTabs) {
+    if (chrome.runtime.lastError) {
+      console.error('BACKGROUND: ❌ Error querying active tab for audio reminder:', chrome.runtime.lastError);
+      fireBackupAudioReminder();
+      return;
+    }
+    
+    let targetTab = null;
+    
+    // Check if active tab is valid for audio
+    if (activeTabs.length > 0) {
+      const activeTab = activeTabs[0];
+      if (activeTab.url && 
+          !activeTab.url.startsWith('chrome://') && 
+          !activeTab.url.startsWith('chrome-extension://') &&
+          !activeTab.url.startsWith('moz-extension://') &&
+          !activeTab.url.startsWith('about:') &&
+          !activeTab.url.startsWith('data:')) {
+        targetTab = activeTab;
+        console.log('BACKGROUND: 🔔 Using active tab for audio reminder:', targetTab.id);
+      }
+    }
+    
+    // If no valid active tab, get first valid tab
+    if (!targetTab) {
+      chrome.tabs.query({}, function(allTabs) {
+        if (chrome.runtime.lastError) {
+          console.error('BACKGROUND: ❌ Error querying all tabs for audio reminder:', chrome.runtime.lastError);
+          fireBackupAudioReminder();
+          return;
+        }
+        
+        const validTabs = allTabs.filter(tab => 
+          tab.url && 
+          !tab.url.startsWith('chrome://') && 
+          !tab.url.startsWith('chrome-extension://') &&
+          !tab.url.startsWith('moz-extension://') &&
+          !tab.url.startsWith('about:') &&
+          !tab.url.startsWith('data:')
+        );
+        
+        if (validTabs.length === 0) {
+          console.log('BACKGROUND: ⚠️ No valid tabs for audio reminder - using backup');
+          fireBackupAudioReminder();
+          return;
+        }
+        
+        targetTab = validTabs[0];
+        console.log('BACKGROUND: 🔔 Using first valid tab for audio reminder:', targetTab.id);
+        sendAudioToSingleTab(targetTab);
+      });
+    } else {
+      sendAudioToSingleTab(targetTab);
+    }
+  });
+}
+
+// Helper function to send audio reminder to a single tab
+function sendAudioToSingleTab(tab) {
+  console.log('BACKGROUND: 🔔 Sending audio reminder to single tab:', tab.id, '(' + tab.url + ')');
+  
+  chrome.tabs.sendMessage(tab.id, {
+    action: 'playStandaloneAudioReminder',
+    timestamp: Date.now(),
+    volume: audioReminderSystem.volume,
+    customSound: audioReminderSystem.customSound,
+    enabled: audioReminderSystem.enabled
+  }).then(() => {
+    console.log('BACKGROUND: ✅ Audio reminder sent successfully to tab', tab.id);
+  }).catch((error) => {
+    console.log('BACKGROUND: ❌ Failed to send audio reminder to tab', tab.id, ':', error.message);
+    
+    // Try injecting content script if missing
+    if (error.message.includes('Receiving end does not exist')) {
+      console.log('BACKGROUND: 🔄 Attempting to inject content script into tab', tab.id);
+      chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        files: ['content.js']
+      }).then(() => {
+        setTimeout(() => {
+          chrome.tabs.sendMessage(tab.id, {
+            action: 'playStandaloneAudioReminder',
+            timestamp: Date.now(),
+            volume: audioReminderSystem.volume,
+            customSound: audioReminderSystem.customSound,
+            enabled: audioReminderSystem.enabled
+          }).then(() => {
+            console.log('BACKGROUND: ✅ Audio reminder retry successful for tab', tab.id);
+          }).catch(() => {
+            console.log('BACKGROUND: ❌ Retry audio reminder failed for tab', tab.id, 'using backup');
+            fireBackupAudioReminder();
+          });
+        }, 500);
+      }).catch(() => {
+        console.log('BACKGROUND: ❌ Could not inject content script for audio reminder, using backup');
+        fireBackupAudioReminder();
+      });
+    } else {
+      fireBackupAudioReminder();
+    }
+  });
+}
+
+// Backup audio reminder when no content scripts available
+function fireBackupAudioReminder() {
+  console.log('BACKGROUND: 🔔 Using backup audio reminder systems');
+  
+  try {
+    // Browser notification with sound
+    chrome.notifications.create({
+      type: 'basic',
+      iconUrl: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="%234CAF50"/></svg>',
+      title: '🔔 Focus Reminder',
+      message: 'Stay focused!',
+      requireInteraction: false,
+      silent: false
+    });
+    console.log('BACKGROUND: ✅ Backup notification created');
+  } catch (error) {
+    console.error('BACKGROUND: ❌ Backup notification failed:', error);
+  }
+  
+  try {
+    // Create temporary tab for audio
+    chrome.tabs.create({
+      url: chrome.runtime.getURL('newtab.html?audioReminder=true'),
+      active: false
+    }, (newTab) => {
+      if (chrome.runtime.lastError) {
+        console.error('BACKGROUND: ❌ Could not create backup audio tab:', chrome.runtime.lastError);
+      } else {
+        console.log('BACKGROUND: ✅ Created backup audio tab:', newTab.id);
+        setTimeout(() => {
+          chrome.tabs.sendMessage(newTab.id, {
+            action: 'playStandaloneAudioReminder',
+            timestamp: Date.now(),
+            volume: audioReminderSystem.volume,
+            customSound: audioReminderSystem.customSound,
+            enabled: audioReminderSystem.enabled,
+            isBackupTab: true
+          }).catch(() => {});
+        }, 1000);
+        
+        // Close backup tab after 3 seconds
+        setTimeout(() => {
+          chrome.tabs.remove(newTab.id).catch(() => {});
+        }, 3000);
+      }
+    });
+  } catch (error) {
+    console.error('BACKGROUND: ❌ Backup audio tab failed:', error);
+  }
+}
+
+// Save standalone audio reminder settings
+function saveAudioReminderSettings() {
+  chrome.storage.sync.set({
+    audioReminderSystem: audioReminderSystem
+  }, function() {
+    if (chrome.runtime.lastError) {
+      console.error('BACKGROUND: Error saving audio reminder settings:', chrome.runtime.lastError);
+    } else {
+      console.log('BACKGROUND: 🔊 Audio reminder settings saved');
+    }
+  });
+}
+
+// =====================================
+// END STANDALONE AUDIO REMINDER SYSTEM
+// =====================================
 
 // Start the global timer
 function startGlobalTimer() {
@@ -475,24 +713,192 @@ function stopStopwatch() {
 }
 
 function startTaskReminder() {
+    console.log('BACKGROUND: Starting task reminder with settings:', {
+        currentTask: globalTimer.currentTask,
+        isRunning: globalTimer.isRunning,
+        reminderFrequency: globalTimer.reminderFrequency,
+        reminderEnabled: globalTimer.reminderEnabled
+    });
+    
     stopTaskReminder(); // Stop any existing reminder
-    if (!globalTimer.currentTask || !globalTimer.isRunning || globalTimer.reminderFrequency === 0 || !globalTimer.reminderEnabled) return;
+    
+    // Check all conditions for reminder
+    if (!globalTimer.isRunning) {
+        console.log('BACKGROUND: Timer not running - reminder not started');
+        return;
+    }
+    if (globalTimer.reminderFrequency === 0) {
+        console.log('BACKGROUND: Reminder frequency is 0 - reminder not started');
+        return;
+    }
+    if (!globalTimer.reminderEnabled) {
+        console.log('BACKGROUND: Reminder disabled - reminder not started');
+        return;
+    }
+    
+    // ✅ FIXED: Allow reminders even without a task (generic focus reminders)
+    const effectiveTask = globalTimer.currentTask || 'Stay Focused';
+    console.log('BACKGROUND: ✅ All conditions met! Using task:', effectiveTask);
 
     const reminderIntervalMs = globalTimer.reminderFrequency * 60 * 1000;
+    console.log('BACKGROUND: ✅ Starting reminder interval every', globalTimer.reminderFrequency, 'minutes (', reminderIntervalMs, 'ms)');
     
     taskReminderInterval = setInterval(() => {
+        console.log('BACKGROUND: 🔔 FIRING REMINDER - sending remindTask to all tabs');
+        
+        // Check if reminder should still fire
+        if (!globalTimer.isRunning || globalTimer.reminderFrequency === 0 || !globalTimer.reminderEnabled) {
+            console.log('BACKGROUND: ❌ Reminder conditions no longer met, stopping reminders');
+            stopTaskReminder();
+            return;
+        }
+        
+        const currentEffectiveTask = globalTimer.currentTask || 'Stay Focused';
+        
         chrome.tabs.query({}, function(tabs) {
-            tabs.forEach(tab => {
-                chrome.tabs.sendMessage(tab.id, { action: 'remindTask' }).catch(() => {});
+            if (chrome.runtime.lastError) {
+                console.error('BACKGROUND: ❌ Error querying tabs:', chrome.runtime.lastError);
+                return;
+            }
+            
+            const validTabs = tabs.filter(tab => 
+                tab.url && 
+                !tab.url.startsWith('chrome://') && 
+                !tab.url.startsWith('chrome-extension://') &&
+                !tab.url.startsWith('moz-extension://') &&
+                !tab.url.startsWith('about:') &&
+                !tab.url.startsWith('data:')
+            );
+            
+            console.log('BACKGROUND: Sending reminder to', validTabs.length, 'valid tabs out of', tabs.length, 'total tabs');
+            
+            if (validTabs.length === 0) {
+                console.log('BACKGROUND: ⚠️ No valid tabs found for reminder - using backup systems');
+                
+                // Multiple backup systems when no content scripts available
+                try {
+                    // 1. Browser notification with sound
+                    chrome.notifications.create({
+                        type: 'basic',
+                        iconUrl: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="%234CAF50"/></svg>',
+                        title: '🔔 Focus Reminder',
+                        message: `Remember: ${currentEffectiveTask}`,
+                        requireInteraction: false,
+                        silent: false // This should play system notification sound
+                    });
+                    console.log('BACKGROUND: ✅ Backup notification created');
+                } catch (notificationError) {
+                    console.error('BACKGROUND: ❌ Could not create backup notification:', notificationError);
+                }
+                
+                // 2. Try to create a new tab with timer that can play audio
+                try {
+                    chrome.tabs.create({
+                        url: chrome.runtime.getURL('newtab.html?reminder=true'),
+                        active: false // Don't switch to the tab
+                    }, (newTab) => {
+                        if (chrome.runtime.lastError) {
+                            console.error('BACKGROUND: ❌ Could not create backup audio tab:', chrome.runtime.lastError);
+                        } else {
+                            console.log('BACKGROUND: ✅ Created backup audio tab:', newTab.id);
+                            // Send reminder message after a short delay
+                            setTimeout(() => {
+                                chrome.tabs.sendMessage(newTab.id, {
+                                    action: 'remindTask',
+                                    timestamp: Date.now(),
+                                    currentTask: currentEffectiveTask,
+                                    reminderVolume: globalTimer.reminderVolume,
+                                    customReminderSound: globalTimer.customReminderSound,
+                                    reminderEnabled: globalTimer.reminderEnabled,
+                                    forcePlay: true,
+                                    isBackupTab: true
+                                }).catch(() => {
+                                    console.log('BACKGROUND: ❌ Backup tab reminder failed, closing tab');
+                                    chrome.tabs.remove(newTab.id);
+                                });
+                            }, 1000);
+                            
+                            // Close the backup tab after 5 seconds
+                            setTimeout(() => {
+                                chrome.tabs.remove(newTab.id).catch(() => {});
+                            }, 5000);
+                        }
+                    });
+                } catch (tabError) {
+                    console.error('BACKGROUND: ❌ Could not create backup tab:', tabError);
+                }
+            }
+            
+            let successCount = 0;
+            let errorCount = 0;
+            
+            validTabs.forEach((tab, index) => {
+                // Add small delay between messages to prevent rate limiting
+                setTimeout(() => {
+                    chrome.tabs.sendMessage(tab.id, { 
+                        action: 'remindTask',
+                        timestamp: Date.now(),
+                        currentTask: currentEffectiveTask,
+                        reminderVolume: globalTimer.reminderVolume,
+                        customReminderSound: globalTimer.customReminderSound,
+                        reminderEnabled: globalTimer.reminderEnabled,
+                        forcePlay: true // Flag to force audio even if timer not visible
+                    }).then(() => {
+                        successCount++;
+                        console.log('BACKGROUND: ✅ Reminder sent to tab', tab.id, '(' + tab.url.substring(0, 50) + '...)');
+                    }).catch((error) => {
+                        errorCount++;
+                        console.log('BACKGROUND: ❌ Failed to send reminder to tab', tab.id, '(' + tab.url.substring(0, 50) + '):', error.message);
+                        
+                        // Try injecting content script if it's missing
+                        if (error.message.includes('Receiving end does not exist')) {
+                            console.log('BACKGROUND: 🔄 Attempting to inject content script into tab', tab.id);
+                            chrome.scripting.executeScript({
+                                target: { tabId: tab.id },
+                                files: ['content.js']
+                            }).then(() => {
+                                console.log('BACKGROUND: ✅ Content script injected, retrying reminder...');
+                                // Retry sending the message after injection
+                                setTimeout(() => {
+                                    chrome.tabs.sendMessage(tab.id, { 
+                                        action: 'remindTask',
+                                        timestamp: Date.now(),
+                                        currentTask: currentEffectiveTask,
+                                        reminderVolume: globalTimer.reminderVolume,
+                                        customReminderSound: globalTimer.customReminderSound,
+                                        reminderEnabled: globalTimer.reminderEnabled,
+                                        forcePlay: true,
+                                        retryAfterInjection: true
+                                    }).catch(() => {
+                                        console.log('BACKGROUND: ❌ Retry failed for tab', tab.id);
+                                    });
+                                }, 500);
+                            }).catch((injectionError) => {
+                                console.log('BACKGROUND: ❌ Could not inject content script into tab', tab.id, ':', injectionError.message);
+                            });
+                        }
+                    });
+                }, index * 50); // 50ms delay between each message
             });
+            
+            // Log summary after all messages are processed
+            setTimeout(() => {
+                console.log('BACKGROUND: 📊 Reminder summary - Success:', successCount, 'Errors:', errorCount);
+            }, validTabs.length * 50 + 100);
         });
     }, reminderIntervalMs);
+    
+    console.log('BACKGROUND: Reminder interval established with ID:', taskReminderInterval);
 }
 
 function stopTaskReminder() {
+    console.log('BACKGROUND: Stopping task reminder, current interval ID:', taskReminderInterval);
     if (taskReminderInterval) {
-        clearTimeout(taskReminderInterval);
+        clearInterval(taskReminderInterval); // FIX: Use clearInterval instead of clearTimeout
         taskReminderInterval = null;
+        console.log('BACKGROUND: ✅ Task reminder stopped and cleared');
+    } else {
+        console.log('BACKGROUND: No active reminder to stop');
     }
 }
 
@@ -818,10 +1224,30 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
       
     case 'setTask':
       console.log('BACKGROUND: Setting task to:', request.task);
+      const previousTask = globalTimer.currentTask;
       globalTimer.currentTask = request.task;
-      if (globalTimer.currentTask) {
+      
+      console.log('BACKGROUND: Task changed from "' + previousTask + '" to "' + globalTimer.currentTask + '"');
+      
+      // Auto-show timer when setting a task if reminders are enabled
+      if (globalTimer.currentTask && globalTimer.reminderEnabled && globalTimer.reminderFrequency > 0) {
+        console.log('BACKGROUND: 🔄 Auto-showing timer for task with reminders');
+        globalTimer.timerVisible = true;
+      }
+      
+      // ✅ FIXED: Start reminders based on timer state, not requiring a task
+      if (globalTimer.isRunning && globalTimer.reminderFrequency > 0 && globalTimer.reminderEnabled) {
+          console.log('BACKGROUND: ✅ Starting reminders - task:', globalTimer.currentTask || 'Stay Focused');
           startTaskReminder();
       } else {
+          console.log('BACKGROUND: Stopping reminders:', {
+              isRunning: globalTimer.isRunning,
+              frequency: globalTimer.reminderFrequency,
+              enabled: globalTimer.reminderEnabled,
+              reason: !globalTimer.isRunning ? 'not running' : 
+                     globalTimer.reminderFrequency === 0 ? 'frequency is 0' : 
+                     !globalTimer.reminderEnabled ? 'reminders disabled' : 'unknown'
+          });
           stopTaskReminder();
       }
       debouncedSaveTimerState();
@@ -871,8 +1297,10 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
     case 'updateReminderFrequency':
       console.log('BACKGROUND: Updating reminder frequency to', request.frequency);
       globalTimer.reminderFrequency = request.frequency;
-      if (globalTimer.isRunning && globalTimer.currentTask) {
+      if (globalTimer.isRunning && globalTimer.reminderEnabled && globalTimer.reminderFrequency > 0) {
         startTaskReminder(); // Restart with new frequency
+      } else {
+        stopTaskReminder(); // Stop if frequency is 0
       }
       debouncedSaveTimerState();
       broadcastTimerUpdate();
@@ -907,13 +1335,77 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
         globalTimer.reminderEnabled = request.enabled;
         if (!request.enabled) {
             stopTaskReminder(); // Stop reminders if disabled
-        } else if (globalTimer.currentTask && globalTimer.isRunning && globalTimer.reminderFrequency > 0) {
+        } else if (globalTimer.isRunning && globalTimer.reminderFrequency > 0) {
             startTaskReminder(); // Start reminders if enabled and conditions are met
         }
         debouncedSaveTimerState();
         broadcastTimerUpdate();
         sendResponse({ success: true });
         break;
+        
+    // =====================================
+    // STANDALONE AUDIO REMINDER HANDLERS
+    // =====================================
+    
+    case 'toggleStandaloneAudioReminder':
+        console.log('BACKGROUND: 🔊 Toggling standalone audio reminder to', request.enabled);
+        audioReminderSystem.enabled = request.enabled;
+        if (request.enabled && audioReminderSystem.frequency > 0) {
+            startStandaloneAudioReminders();
+        } else {
+            stopStandaloneAudioReminders();
+        }
+        saveAudioReminderSettings();
+        sendResponse({ success: true, enabled: audioReminderSystem.enabled });
+        break;
+        
+    case 'updateStandaloneAudioFrequency':
+        console.log('BACKGROUND: 🔊 Updating standalone audio frequency to', request.frequency);
+        audioReminderSystem.frequency = Math.max(0, Math.min(60, request.frequency));
+        if (audioReminderSystem.enabled && audioReminderSystem.frequency > 0) {
+            startStandaloneAudioReminders(); // Restart with new frequency
+        } else {
+            stopStandaloneAudioReminders();
+        }
+        saveAudioReminderSettings();
+        sendResponse({ success: true, frequency: audioReminderSystem.frequency });
+        break;
+        
+    case 'updateStandaloneAudioVolume':
+        console.log('BACKGROUND: 🔊 Updating standalone audio volume to', request.volume);
+        audioReminderSystem.volume = Math.max(0, Math.min(1, request.volume));
+        saveAudioReminderSettings();
+        sendResponse({ success: true, volume: audioReminderSystem.volume });
+        break;
+        
+    case 'setStandaloneAudioCustomSound':
+        console.log('BACKGROUND: 🔊 Setting standalone audio custom sound');
+        audioReminderSystem.customSound = request.sound;
+        saveAudioReminderSettings();
+        sendResponse({ success: true });
+        break;
+        
+    case 'removeStandaloneAudioCustomSound':
+        console.log('BACKGROUND: 🔊 Removing standalone audio custom sound');
+        audioReminderSystem.customSound = null;
+        saveAudioReminderSettings();
+        sendResponse({ success: true });
+        break;
+        
+    case 'getStandaloneAudioState':
+        console.log('BACKGROUND: 🔊 Getting standalone audio state');
+        sendResponse({
+            enabled: audioReminderSystem.enabled,
+            frequency: audioReminderSystem.frequency,
+            volume: audioReminderSystem.volume,
+            customSound: audioReminderSystem.customSound,
+            hasCustomSound: !!audioReminderSystem.customSound
+        });
+        break;
+        
+    // =====================================
+    // END STANDALONE AUDIO REMINDER HANDLERS
+    // =====================================
         
     case 'toggleNewtab':
       console.log('BACKGROUND: Toggling new tab redirect to:', request.enabled);

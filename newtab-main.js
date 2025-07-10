@@ -157,9 +157,21 @@ function startBlockedPageTimerUpdates() {
             }
             
             if (response && response.timeLeft !== undefined) {
-                const minutes = Math.floor(response.timeLeft / 60);
-                const seconds = response.timeLeft % 60;
-                const timeString = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                // Validate timeLeft - handle undefined, null, NaN cases
+                let safeTimeLeft = response.timeLeft;
+                if (typeof response.timeLeft !== 'number' || isNaN(response.timeLeft) || response.timeLeft < 0) {
+                    debugLog('Invalid timeLeft value for blocked page:', response.timeLeft, 'defaulting to 25:00');
+                    safeTimeLeft = 25 * 60; // Default to 25 minutes
+                }
+                
+                const minutes = Math.floor(safeTimeLeft / 60);
+                const seconds = safeTimeLeft % 60;
+                
+                // Ensure we don't display NaN
+                const displayMinutes = isNaN(minutes) ? 25 : minutes;
+                const displaySeconds = isNaN(seconds) ? 0 : seconds;
+                
+                const timeString = `${displayMinutes.toString().padStart(2, '0')}:${displaySeconds.toString().padStart(2, '0')}`;
                 
                 const timerElement = document.getElementById('blockedPageTimer');
                 if (timerElement) {
@@ -409,10 +421,22 @@ function updateDisplay(timeLeft, mode) {
     const display = timerElement.querySelector('.timer-display');
     const switchModeBtn = timerElement.querySelector('#switchModeBtn');
 
-    // Format time
-    const minutes = Math.floor(Math.abs(timeLeft) / 60);
-    const seconds = Math.abs(timeLeft) % 60;
-    display.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    // Validate timeLeft - handle undefined, null, NaN cases
+    let safeTimeLeft = timeLeft;
+    if (typeof timeLeft !== 'number' || isNaN(timeLeft) || timeLeft < 0) {
+        debugLog('Invalid timeLeft value received:', timeLeft, 'defaulting to 25:00');
+        safeTimeLeft = 25 * 60; // Default to 25 minutes
+    }
+
+    // Format time with validated values
+    const minutes = Math.floor(Math.abs(safeTimeLeft) / 60);
+    const seconds = Math.abs(safeTimeLeft) % 60;
+    
+    // Ensure we don't display NaN
+    const displayMinutes = isNaN(minutes) ? 25 : minutes;
+    const displaySeconds = isNaN(seconds) ? 0 : seconds;
+    
+    display.textContent = `${displayMinutes}:${displaySeconds.toString().padStart(2, '0')}`;
 
     // Update mode styling and button text
     if (mode === 'stopwatch') {
@@ -532,6 +556,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             updateStopwatchDisplay(request.stopwatch);
             updateFrequencyControls(request.reminderFrequency, request.currentTask, request.customReminderSound);
             debugLog('Timer display updated from background - Time:', request.timeLeft, 'Running:', request.isRunning);
+        }
+    } else if (request.action === 'playStandaloneAudioReminder') {
+        debugLog('🔊 Received standalone audio reminder:', request);
+        playStandaloneNewtabAudioReminder(request);
+        if (sendResponse) {
+            sendResponse({ success: true, timestamp: request.timestamp });
         }
     }
 });
@@ -726,5 +756,110 @@ function adjustFrequency(change) {
         }
     });
 }
+
+// =====================================
+// STANDALONE AUDIO REMINDER FOR NEWTAB
+// =====================================
+
+function playStandaloneNewtabAudioReminder(request) {
+    debugLog('🔊 Playing standalone audio reminder on newtab:', request);
+    
+    if (!request.enabled) {
+        debugLog('🔊 Standalone audio reminder disabled - not playing');
+        return;
+    }
+    
+    const volume = Math.max(0, Math.min(1, request.volume || 0.5));
+    debugLog('🔊 Playing standalone audio reminder with volume:', volume);
+    
+    if (request.customSound) {
+        debugLog('🔊 Playing custom audio for standalone reminder');
+        playNewtabCustomAudio(request.customSound, volume);
+    } else {
+        debugLog('🔊 Playing standard beep for standalone reminder');
+        playNewtabStandardBeep(volume);
+    }
+}
+
+function playNewtabCustomAudio(audioDataUrl, volume) {
+    try {
+        const audio = new Audio(audioDataUrl);
+        audio.volume = volume;
+        
+        audio.addEventListener('error', (e) => {
+            debugLog('🔊 Newtab custom audio error:', e.error);
+            playNewtabStandardBeep(volume);
+        });
+        
+        const playPromise = audio.play();
+        if (playPromise) {
+            playPromise.then(() => {
+                debugLog('🔊 Newtab custom audio started playing');
+            }).catch((error) => {
+                debugLog('🔊 Newtab custom audio play failed:', error);
+                playNewtabStandardBeep(volume);
+            });
+        }
+    } catch (error) {
+        debugLog('🔊 Error creating newtab custom audio:', error);
+        playNewtabStandardBeep(volume);
+    }
+}
+
+function playNewtabStandardBeep(volume) {
+    try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) {
+            debugLog('🔊 AudioContext not supported on newtab');
+            return;
+        }
+        
+        const audioCtx = new AudioContext();
+        
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume().then(() => {
+                createNewtabStandardOscillator(audioCtx, volume);
+            }).catch((error) => {
+                debugLog('🔊 Failed to resume AudioContext on newtab:', error);
+            });
+        } else {
+            createNewtabStandardOscillator(audioCtx, volume);
+        }
+    } catch (error) {
+        debugLog('🔊 Error creating AudioContext on newtab:', error);
+    }
+}
+
+function createNewtabStandardOscillator(audioCtx, volume) {
+    try {
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+
+        // Standard beep characteristics - single clean tone
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(800, audioCtx.currentTime);
+        gainNode.gain.setValueAtTime(volume * 0.7, audioCtx.currentTime);
+        
+        // Single short beep
+        oscillator.start(audioCtx.currentTime);
+        oscillator.stop(audioCtx.currentTime + 0.15);
+        
+        oscillator.addEventListener('ended', () => {
+            debugLog('🔊 Newtab standard beep completed');
+            audioCtx.close().catch(() => {});
+        });
+        
+        debugLog('🔊 Newtab standard beep started playing');
+    } catch (error) {
+        debugLog('🔊 Error creating newtab oscillator:', error);
+    }
+}
+
+// =====================================
+// END STANDALONE AUDIO REMINDER FOR NEWTAB
+// =====================================
 
 debugLog('Script loaded, waiting for DOM...'); 

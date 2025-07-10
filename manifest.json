@@ -8,7 +8,8 @@
     "storage",
     "tabs",
     "scripting",
-    "webNavigation"
+    "webNavigation",
+    "notifications"
   ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"

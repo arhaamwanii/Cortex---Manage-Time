@@ -552,38 +552,469 @@ function openSoundUpload() {
     input.click();
 }
 
-function playReminderSound() {
-  chrome.runtime.sendMessage({action: 'getTimerState'}, function(response) {
-    if (!response || !response.reminderEnabled) {
-      console.log('CONTENT: Reminder sound disabled or no response');
+// =====================================
+// STANDALONE AUDIO REMINDER SYSTEM
+// =====================================
+
+function playStandaloneAudioReminder(request) {
+  console.log('CONTENT: 🔊 Playing standalone audio reminder with settings:', {
+    enabled: request.enabled,
+    volume: request.volume,
+    hasCustomSound: !!request.customSound,
+    isBackupTab: request.isBackupTab
+  });
+  
+  if (!request.enabled) {
+    console.log('CONTENT: 🔊 Standalone audio reminder disabled - not playing');
+    return;
+  }
+  
+  const volume = Math.max(0, Math.min(1, request.volume || 0.5));
+  console.log('CONTENT: 🔊 Playing standalone audio reminder with volume:', volume);
+  
+  if (request.customSound) {
+    console.log('CONTENT: 🔊 Playing custom audio for standalone reminder');
+    playStandaloneCustomAudio(request.customSound, volume);
+  } else {
+    console.log('CONTENT: 🔊 Playing default beep for standalone reminder');
+    playStandardBeep(volume);
+  }
+}
+
+function playStandaloneCustomAudio(audioDataUrl, volume) {
+  console.log('CONTENT: 🔊 Creating standalone custom audio with volume:', volume);
+  try {
+    const audio = new Audio(audioDataUrl);
+    audio.volume = volume;
+    
+    audio.addEventListener('error', (e) => {
+      console.error('CONTENT: 🔊 Standalone custom audio error:', e.error);
+      console.log('CONTENT: 🔊 Falling back to standard beep');
+      playStandardBeep(volume);
+    });
+    
+    const playPromise = audio.play();
+    if (playPromise) {
+      playPromise.then(() => {
+        console.log('CONTENT: 🔊 Standalone custom audio started playing');
+      }).catch((error) => {
+        console.error('CONTENT: 🔊 Standalone custom audio play failed:', error);
+        playStandardBeep(volume);
+      });
+    }
+  } catch (error) {
+    console.error('CONTENT: 🔊 Error creating standalone custom audio:', error);
+    playStandardBeep(volume);
+  }
+}
+
+function playStandardBeep(volume) {
+  console.log('CONTENT: 🔊 Playing standard beep with volume:', volume);
+  
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) {
+      console.log('CONTENT: 🔊 AudioContext not supported, using fallback');
+      playStandardBeepFallback(volume);
       return;
     }
     
-    const volume = response.reminderVolume || 0.5; // Default to 50% if not set
+    const audioCtx = new AudioContext();
     
-    if (response.customReminderSound) {
-      const audio = new Audio(response.customReminderSound);
-      audio.volume = volume; // Use user-configured volume
-      audio.play();
+    // Handle suspended audio context
+    if (audioCtx.state === 'suspended') {
+      console.log('CONTENT: 🔊 AudioContext suspended, resuming...');
+      audioCtx.resume().then(() => {
+        createStandardOscillator(audioCtx, volume);
+      }).catch((error) => {
+        console.error('CONTENT: 🔊 Failed to resume AudioContext:', error);
+        playStandardBeepFallback(volume);
+      });
     } else {
-      // Fallback to generated tone
-      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      const oscillator = audioCtx.createOscillator();
-      const gainNode = audioCtx.createGain();
-
-      oscillator.connect(gainNode);
-      gainNode.connect(audioCtx.destination);
-
-      // Sound characteristics
-      oscillator.type = 'sine';
-      oscillator.frequency.setValueAtTime(300, audioCtx.currentTime);
-      gainNode.gain.setValueAtTime(volume, audioCtx.currentTime); // Use user-configured volume
-
-      // Play and stop the sound
-      oscillator.start(audioCtx.currentTime);
-      oscillator.stop(audioCtx.currentTime + 0.15); // Play for 0.15 seconds
+      createStandardOscillator(audioCtx, volume);
     }
-  });
+  } catch (error) {
+    console.error('CONTENT: 🔊 Error creating AudioContext:', error);
+    playStandardBeepFallback(volume);
+  }
+}
+
+function createStandardOscillator(audioCtx, volume) {
+  try {
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+
+    // Standard beep characteristics - single clean tone
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(800, audioCtx.currentTime); // Higher frequency for better audibility
+    gainNode.gain.setValueAtTime(volume * 0.7, audioCtx.currentTime); // Prevent distortion
+    
+    // Single short beep
+    oscillator.start(audioCtx.currentTime);
+    oscillator.stop(audioCtx.currentTime + 0.15); // Short 150ms beep
+    
+    oscillator.addEventListener('ended', () => {
+      console.log('CONTENT: 🔊 Standard beep completed');
+      audioCtx.close().catch(() => {}); // Ignore close errors
+    });
+    
+    console.log('CONTENT: 🔊 Standard beep started playing');
+  } catch (error) {
+    console.error('CONTENT: 🔊 Error creating standard oscillator:', error);
+    playStandardBeepFallback(volume);
+  }
+}
+
+function playStandardBeepFallback(volume) {
+  console.log('CONTENT: 🔊 Using standard beep fallback');
+  
+  try {
+    // Create a simple WAV beep
+    const duration = 0.15; // 150ms
+    const frequency = 800; // 800Hz
+    const sampleRate = 44100;
+    const samples = Math.floor(sampleRate * duration);
+    const buffer = new ArrayBuffer(44 + samples * 2);
+    const view = new DataView(buffer);
+    
+    // WAV header
+    const writeString = (offset, str) => {
+      for (let i = 0; i < str.length; i++) {
+        view.setUint8(offset + i, str.charCodeAt(i));
+      }
+    };
+    
+    writeString(0, 'RIFF');
+    view.setUint32(4, 36 + samples * 2, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 1, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * 2, true);
+    view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true);
+    writeString(36, 'data');
+    view.setUint32(40, samples * 2, true);
+    
+    // Generate sine wave
+    for (let i = 0; i < samples; i++) {
+      const sample = Math.sin(2 * Math.PI * frequency * i / sampleRate) * volume * 32767;
+      view.setInt16(44 + i * 2, sample, true);
+    }
+    
+    const blob = new Blob([buffer], { type: 'audio/wav' });
+    const audio = new Audio(URL.createObjectURL(blob));
+    audio.volume = volume;
+    
+    const playPromise = audio.play();
+    if (playPromise) {
+      playPromise.then(() => {
+        console.log('CONTENT: 🔊 Standard beep fallback started playing');
+      }).catch(() => {
+        console.log('CONTENT: 🔊 Standard beep fallback failed - no audio available');
+      });
+    }
+    
+    audio.addEventListener('ended', () => {
+      URL.revokeObjectURL(audio.src);
+    });
+    
+  } catch (error) {
+    console.error('CONTENT: 🔊 Standard beep fallback failed:', error);
+  }
+}
+
+// =====================================
+// END STANDALONE AUDIO REMINDER SYSTEM
+// =====================================
+
+function playReminderSound(reminderData = null) {
+  console.log('CONTENT: 🔊 playReminderSound called with data:', reminderData);
+  
+  // If reminder data is provided (from message), use it directly to avoid race conditions
+  if (reminderData) {
+    console.log('CONTENT: Using provided reminder data:', {
+      reminderEnabled: reminderData.reminderEnabled,
+      reminderVolume: reminderData.reminderVolume,
+      hasCustomSound: !!reminderData.customReminderSound
+    });
+    
+    if (!reminderData.reminderEnabled) {
+      console.log('CONTENT: ❌ Reminder disabled - not playing sound');
+      return;
+    }
+    
+    const volume = Math.max(0, Math.min(1, reminderData.reminderVolume || 0.5));
+    console.log('CONTENT: ✅ FORCE PLAYING AUDIO - Volume:', volume);
+    
+    if (reminderData.customReminderSound) {
+      console.log('CONTENT: 🎵 Playing custom audio file');
+      playCustomAudio(reminderData.customReminderSound, volume);
+    } else {
+      console.log('CONTENT: 🎵 Playing generated tone');
+      playGeneratedTone(volume);
+    }
+  } else {
+    // Fallback: get state from background (old behavior)
+    console.log('CONTENT: No reminder data provided, fetching from background...');
+    
+    // Handle "Extension context invalidated" error gracefully
+    try {
+      chrome.runtime.sendMessage({action: 'getTimerState'}, function(response) {
+        if (chrome.runtime.lastError) {
+          console.error('CONTENT: ❌ Failed to get timer state:', chrome.runtime.lastError);
+          
+          // If extension context is invalidated, play default audio anyway
+          if (chrome.runtime.lastError.message && chrome.runtime.lastError.message.includes('context invalidated')) {
+            console.log('CONTENT: 🚨 Extension context invalidated - playing default audio');
+            playGeneratedTone(0.5); // Default volume
+          }
+          return;
+        }
+        
+        if (!response) {
+          console.log('CONTENT: ❌ No response from background - playing default audio');
+          playGeneratedTone(0.5); // Default volume
+          return;
+        }
+        
+        if (!response.reminderEnabled) {
+          console.log('CONTENT: ❌ Reminder disabled in response');
+          return;
+        }
+        
+        const volume = Math.max(0, Math.min(1, response.reminderVolume || 0.5));
+        console.log('CONTENT: Playing sound with volume from background:', volume);
+        
+        if (response.customReminderSound) {
+          console.log('CONTENT: 🎵 Playing custom audio file from background');
+          playCustomAudio(response.customReminderSound, volume);
+        } else {
+          console.log('CONTENT: 🎵 Playing generated tone from background');
+          playGeneratedTone(volume);
+        }
+      });
+    } catch (sendMessageError) {
+      console.error('CONTENT: 🚨 chrome.runtime.sendMessage failed:', sendMessageError);
+      console.log('CONTENT: 🚨 Playing default audio as emergency fallback');
+      playGeneratedTone(0.5); // Emergency fallback
+    }
+  }
+}
+
+function playCustomAudio(audioDataUrl, volume) {
+  console.log('CONTENT: 🎵 Creating custom audio element with volume:', volume);
+  try {
+    const audio = new Audio(audioDataUrl);
+    audio.volume = volume;
+    
+    audio.addEventListener('canplaythrough', () => {
+      console.log('CONTENT: ✅ Custom audio loaded successfully');
+    });
+    
+    audio.addEventListener('error', (e) => {
+      console.error('CONTENT: ❌ Custom audio error:', e.error);
+      console.log('CONTENT: 🔄 Falling back to generated tone');
+      playGeneratedTone(volume);
+    });
+    
+    audio.addEventListener('ended', () => {
+      console.log('CONTENT: ✅ Custom audio playback completed');
+    });
+    
+    const playPromise = audio.play();
+    if (playPromise) {
+      playPromise.then(() => {
+        console.log('CONTENT: ✅ Custom audio started playing');
+      }).catch((error) => {
+        console.error('CONTENT: ❌ Custom audio play failed:', error);
+        console.log('CONTENT: 🔄 Falling back to generated tone');
+        playGeneratedTone(volume);
+      });
+    }
+  } catch (error) {
+    console.error('CONTENT: ❌ Error creating custom audio:', error);
+    console.log('CONTENT: 🔄 Falling back to generated tone');
+    playGeneratedTone(volume);
+  }
+}
+
+function playGeneratedTone(volume) {
+  console.log('CONTENT: 🎵 Creating generated tone with volume:', volume);
+  
+  // Try AudioContext first
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) {
+      console.error('CONTENT: ❌ AudioContext not supported, trying fallback');
+      playFallbackBeep(volume);
+      return;
+    }
+    
+    const audioCtx = new AudioContext();
+    
+    // Handle suspended audio context (common in Chrome)
+    if (audioCtx.state === 'suspended') {
+      console.log('CONTENT: 🔄 AudioContext suspended, trying to resume...');
+      audioCtx.resume().then(() => {
+        console.log('CONTENT: ✅ AudioContext resumed');
+        createOscillatorBeep(audioCtx, volume);
+      }).catch((error) => {
+        console.error('CONTENT: ❌ Failed to resume AudioContext:', error);
+        playFallbackBeep(volume);
+      });
+    } else {
+      createOscillatorBeep(audioCtx, volume);
+    }
+  } catch (error) {
+    console.error('CONTENT: ❌ Error creating AudioContext:', error);
+    playFallbackBeep(volume);
+  }
+}
+
+function createOscillatorBeep(audioCtx, volume) {
+  try {
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+
+    // Sound characteristics
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(400, audioCtx.currentTime); // Increased frequency for better audibility
+    gainNode.gain.setValueAtTime(volume * 0.8, audioCtx.currentTime); // Slightly reduce to prevent distortion
+
+    // Play and stop the sound
+    oscillator.start(audioCtx.currentTime);
+    oscillator.stop(audioCtx.currentTime + 0.2); // Slightly longer for better audibility
+    
+    oscillator.addEventListener('ended', () => {
+      console.log('CONTENT: ✅ Generated tone playback completed');
+      audioCtx.close().catch(() => {}); // Ignore close errors
+    });
+    
+    oscillator.addEventListener('error', (error) => {
+      console.error('CONTENT: ❌ Oscillator error:', error);
+      playFallbackBeep(volume);
+    });
+    
+    console.log('CONTENT: ✅ Generated tone started playing');
+  } catch (error) {
+    console.error('CONTENT: ❌ Error creating oscillator:', error);
+    playFallbackBeep(volume);
+  }
+}
+
+function playFallbackBeep(volume) {
+  console.log('CONTENT: 🔄 Using fallback beep method with volume:', volume);
+  
+  // Method 1: Try creating a data URL audio element
+  try {
+    // Generate a simple beep tone using data URL
+    const duration = 0.2;
+    const frequency = 400;
+    const sampleRate = 44100;
+    const samples = Math.floor(sampleRate * duration);
+    const buffer = new ArrayBuffer(44 + samples * 2);
+    const view = new DataView(buffer);
+    
+    // WAV header
+    const writeString = (offset, str) => {
+      for (let i = 0; i < str.length; i++) {
+        view.setUint8(offset + i, str.charCodeAt(i));
+      }
+    };
+    
+    writeString(0, 'RIFF');
+    view.setUint32(4, 36 + samples * 2, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 1, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * 2, true);
+    view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true);
+    writeString(36, 'data');
+    view.setUint32(40, samples * 2, true);
+    
+    // Generate sine wave
+    for (let i = 0; i < samples; i++) {
+      const sample = Math.sin(2 * Math.PI * frequency * i / sampleRate) * volume * 32767;
+      view.setInt16(44 + i * 2, sample, true);
+    }
+    
+    const blob = new Blob([buffer], { type: 'audio/wav' });
+    const audio = new Audio(URL.createObjectURL(blob));
+    audio.volume = volume;
+    
+    const playPromise = audio.play();
+    if (playPromise) {
+      playPromise.then(() => {
+        console.log('CONTENT: ✅ Fallback beep started playing');
+      }).catch((error) => {
+        console.error('CONTENT: ❌ Fallback beep failed:', error);
+        playUltimateFallback();
+      });
+    }
+    
+    audio.addEventListener('ended', () => {
+      console.log('CONTENT: ✅ Fallback beep completed');
+      URL.revokeObjectURL(audio.src);
+    });
+    
+  } catch (error) {
+    console.error('CONTENT: ❌ Fallback beep method failed:', error);
+    playUltimateFallback();
+  }
+}
+
+function playUltimateFallback() {
+  console.log('CONTENT: 🚨 Using ultimate fallback - visual flash');
+  
+  // Create a brief visual flash as the last resort
+  const flash = document.createElement('div');
+  flash.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(76, 175, 80, 0.3);
+    z-index: 999999;
+    pointer-events: none;
+    animation: reminderFlash 0.3s ease-out;
+  `;
+  
+  // Add keyframes if not already present
+  if (!document.querySelector('#reminder-flash-styles')) {
+    const styles = document.createElement('style');
+    styles.id = 'reminder-flash-styles';
+    styles.textContent = `
+      @keyframes reminderFlash {
+        0% { opacity: 0; }
+        50% { opacity: 1; }
+        100% { opacity: 0; }
+      }
+    `;
+    document.head.appendChild(styles);
+  }
+  
+  document.body.appendChild(flash);
+  
+  setTimeout(() => {
+    if (flash.parentNode) {
+      flash.parentNode.removeChild(flash);
+    }
+    console.log('CONTENT: ✅ Visual flash reminder completed');
+  }, 300);
 }
 
 // TIMER IS AUTHORITY: Report actual state to background for popup sync
@@ -719,15 +1150,88 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
       break;
       
     case 'remindTask':
+      console.log('CONTENT: 🔔 Received remindTask message:', {
+        timestamp: request.timestamp,
+        currentTask: request.currentTask,
+        reminderVolume: request.reminderVolume,
+        reminderEnabled: request.reminderEnabled,
+        hasCustomSound: !!request.customReminderSound,
+        hasTimerElement: !!timerElement,
+        forcePlay: request.forcePlay,
+        retryAfterInjection: request.retryAfterInjection,
+        url: window.location.href.substring(0, 50)
+      });
+      
+      // ALWAYS play audio if forcePlay is true, regardless of timer visibility
+      if (request.forcePlay || request.reminderEnabled) {
+        console.log('CONTENT: 🎵 Force playing reminder sound (forcePlay:', request.forcePlay, ', enabled:', request.reminderEnabled, ')');
+        
+        // Pass reminder data directly to avoid race condition
+        playReminderSound({
+          reminderEnabled: request.reminderEnabled,
+          reminderVolume: request.reminderVolume,
+          customReminderSound: request.customReminderSound
+        });
+        
+        // Show notification if no timer element visible
+        if (!timerElement && request.currentTask) {
+          console.log('CONTENT: 📢 No timer element - showing notification for task:', request.currentTask);
+          if (Notification.permission === 'granted') {
+            new Notification('Task Reminder', {
+              body: `Don't forget: ${request.currentTask}`,
+              icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="%234CAF50"/></svg>',
+              silent: false // Allow sound
+            });
+          } else if (Notification.permission === 'default') {
+            Notification.requestPermission().then(permission => {
+              if (permission === 'granted') {
+                new Notification('Task Reminder', {
+                  body: `Don't forget: ${request.currentTask}`,
+                  icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="%234CAF50"/></svg>',
+                  silent: false
+                });
+              }
+            });
+          }
+        }
+      }
+      
+      // Visual effects only if timer is visible
       if (timerElement) {
         const taskDisplay = timerElement.querySelector('.task-display');
+        console.log('CONTENT: Task display element found:', !!taskDisplay, 'has text:', taskDisplay?.textContent);
+        
         if (taskDisplay && taskDisplay.textContent) {
-          playReminderSound();
+          console.log('CONTENT: ✅ Showing visual glow effect');
+          
           taskDisplay.classList.add('task-glow');
           setTimeout(() => {
             taskDisplay.classList.remove('task-glow');
+            console.log('CONTENT: ✅ Task glow effect completed');
           }, 2000); // Glow for 2 seconds
+        } else {
+          console.log('CONTENT: ❌ No task display or task text - skipping visual effects');
         }
+      } else {
+        console.log('CONTENT: ❌ No timer element - audio played but no visual effects');
+      }
+      
+      // Send acknowledgment back to background
+      if (sendResponse) {
+        sendResponse({ 
+          success: true, 
+          hasTimerElement: !!timerElement,
+          playedAudio: !!(request.forcePlay || request.reminderEnabled),
+          url: window.location.href
+        });
+      }
+      break;
+      
+    case 'playStandaloneAudioReminder':
+      console.log('CONTENT: 🔊 Received standalone audio reminder:', request);
+      playStandaloneAudioReminder(request);
+      if (sendResponse) {
+        sendResponse({ success: true, timestamp: request.timestamp });
       }
       break;
 
