@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Elevate",
+  "name": "Elevate : Rise Above Distractions",
   "version": "1.0",
-  "description": "Elevate: Rise Above Distractions. A smart, floating Pomodoro timer that follows you across every website for focused productivity",
+  "description": "A smart floating Pomodoro timer that Follows you around the Web, Refines Productivity & Blocks Distraction",
   "permissions": [
     "activeTab",
     "storage",
