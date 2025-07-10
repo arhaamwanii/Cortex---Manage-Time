@@ -4,6 +4,7 @@ console.log('BACKGROUND: Service worker starting/restarting at', new Date().toIS
 // NEW TAB REDIRECT LOGIC (instead of chrome_url_overrides)
 // Track tabs that are created for navigation (links, redirects) - these should NOT be redirected
 const navigationTabs = new Set();
+const extensionTabs = new Set(); // Track tabs opened from extension contexts
 
 // Listen for tabs created specifically for navigation (links, redirects, etc.)
 chrome.webNavigation.onCreatedNavigationTarget.addListener((details) => {
@@ -13,7 +14,7 @@ chrome.webNavigation.onCreatedNavigationTarget.addListener((details) => {
   // Clean up after navigation completes or fails
   setTimeout(() => {
     navigationTabs.delete(details.tabId);
-  }, 5000); // Clean up after 5 seconds
+  }, 10000); // Increased timeout to 10 seconds
 });
 
 chrome.tabs.onCreated.addListener((tab) => {
@@ -23,6 +24,23 @@ chrome.tabs.onCreated.addListener((tab) => {
     openerTabId: tab.openerTabId,
     pendingUrl: tab.pendingUrl
   });
+  
+  // Check if this tab was opened from an extension context
+  if (tab.openerTabId) {
+    chrome.tabs.get(tab.openerTabId, (openerTab) => {
+      if (!chrome.runtime.lastError && openerTab.url) {
+        if (openerTab.url.startsWith('chrome-extension://') || openerTab.url.startsWith('moz-extension://')) {
+          console.log('BACKGROUND: Tab opened from extension context, marking as extension tab');
+          extensionTabs.add(tab.id);
+          // Clean up after 15 seconds
+          setTimeout(() => {
+            extensionTabs.delete(tab.id);
+          }, 15000);
+          return; // Don't redirect extension-opened tabs
+        }
+      }
+    });
+  }
   
   // Check if it's a blank new tab
   const isBlankTab = tab.url === 'chrome://newtab/' || 
@@ -38,19 +56,26 @@ chrome.tabs.onCreated.addListener((tab) => {
       return;
     }
     
+    // If this tab is marked as extension-opened, DO NOT redirect
+    if (extensionTabs.has(tab.id)) {
+      console.log('BACKGROUND: Tab opened from extension, will not redirect');
+      return;
+    }
+    
     // Check for pendingUrl which indicates intended navigation
     if (tab.pendingUrl && tab.pendingUrl !== 'chrome://newtab/' && tab.pendingUrl !== 'about:blank') {
       console.log('BACKGROUND: Tab has pendingUrl, will not redirect:', tab.pendingUrl);
       return;
     }
     
-    // If tab has opener but no pendingUrl, wait briefly to see if URL loads
+    // If tab has opener, wait longer to see if URL loads
     if (tab.openerTabId) {
-      console.log('BACKGROUND: Tab has opener, checking for URL loading...');
+      console.log('BACKGROUND: Tab has opener, waiting longer to check for URL loading...');
+      
+      // First check after 500ms
       setTimeout(() => {
-        // Double-check this isn't a navigation target that was missed
-        if (navigationTabs.has(tab.id)) {
-          console.log('BACKGROUND: Tab became navigation target, not redirecting');
+        if (navigationTabs.has(tab.id) || extensionTabs.has(tab.id)) {
+          console.log('BACKGROUND: Tab became navigation/extension target, not redirecting');
           return;
         }
         
@@ -59,23 +84,65 @@ chrome.tabs.onCreated.addListener((tab) => {
             return;
           }
           
-          // If still blank and not a navigation target, might be a weird edge case - redirect
           const stillBlank = updatedTab.url === 'chrome://newtab/' || 
                             updatedTab.url === 'about:blank' || 
                             !updatedTab.url || 
                             updatedTab.url === '' ||
                             updatedTab.url === 'chrome://new-tab-page/';
           
-          if (stillBlank && !navigationTabs.has(tab.id)) {
-            console.log('BACKGROUND: Tab with opener remained blank, redirecting as fallback');
-            redirectToTimer(tab.id);
+          if (stillBlank && !navigationTabs.has(tab.id) && !extensionTabs.has(tab.id)) {
+            // Wait even longer before final decision
+            setTimeout(() => {
+              chrome.tabs.get(tab.id, (finalTab) => {
+                if (chrome.runtime.lastError) {
+                  return;
+                }
+                
+                const finallyBlank = finalTab.url === 'chrome://newtab/' || 
+                                   finalTab.url === 'about:blank' || 
+                                   !finalTab.url || 
+                                   finalTab.url === '' ||
+                                   finalTab.url === 'chrome://new-tab-page/';
+                
+                if (finallyBlank && !navigationTabs.has(tab.id) && !extensionTabs.has(tab.id)) {
+                  console.log('BACKGROUND: Tab with opener remained blank after extended wait, redirecting as fallback');
+                  redirectToTimer(tab.id);
+                } else {
+                  console.log('BACKGROUND: Tab with opener now has URL or is marked as navigation/extension, not redirecting');
+                }
+              });
+            }, 2000); // Wait another 2 seconds for final check
           }
         });
-      }, 100);
+      }, 500);
     } else {
-      // No opener and no pendingUrl = genuine new tab (Ctrl+T, + button) - redirect immediately
-      console.log('BACKGROUND: Genuine new tab (no opener, no pendingUrl), redirecting immediately');
-      redirectToTimer(tab.id);
+      // No opener = likely genuine new tab (Ctrl+T, + button)
+      // But still wait briefly in case it's a delayed navigation
+      setTimeout(() => {
+        if (navigationTabs.has(tab.id) || extensionTabs.has(tab.id)) {
+          console.log('BACKGROUND: Tab became navigation/extension target during delay, not redirecting');
+          return;
+        }
+        
+        chrome.tabs.get(tab.id, (updatedTab) => {
+          if (chrome.runtime.lastError) {
+            return;
+          }
+          
+          const stillBlank = updatedTab.url === 'chrome://newtab/' || 
+                            updatedTab.url === 'about:blank' || 
+                            !updatedTab.url || 
+                            updatedTab.url === '' ||
+                            updatedTab.url === 'chrome://new-tab-page/';
+          
+          if (stillBlank && !navigationTabs.has(tab.id) && !extensionTabs.has(tab.id)) {
+            console.log('BACKGROUND: Genuine new tab confirmed (no opener, remained blank), redirecting');
+            redirectToTimer(tab.id);
+          } else {
+            console.log('BACKGROUND: Tab without opener now has URL or is marked as navigation/extension, not redirecting');
+          }
+        });
+      }, 200); // Short delay for no-opener tabs
     }
   }
 });
@@ -116,6 +183,19 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     }
   }
   
+  // Track when extension tabs start loading real URLs
+  if (extensionTabs.has(tabId) && changeInfo.url) {
+    const url = changeInfo.url;
+    if (url !== 'chrome://newtab/' && 
+        url !== 'about:blank' && 
+        url !== '' && 
+        url !== 'chrome://new-tab-page/' &&
+        !url.includes('newtab.html')) {
+      console.log('BACKGROUND: Extension tab loading real URL:', url);
+      // Keep it in extensionTabs to prevent any future redirect attempts
+    }
+  }
+  
   // Only check when the page is loading our newtab.html
   if (changeInfo.status === 'loading' && tab.url && tab.url.includes('newtab.html')) {
     chrome.storage.sync.get(['newtabEnabled'], (result) => {
@@ -136,6 +216,18 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   if (navigationTabs.has(tabId)) {
     console.log('BACKGROUND: Cleaning up closed navigation tab:', tabId);
     navigationTabs.delete(tabId);
+  }
+});
+
+// Clean up tracking sets when tabs are removed
+chrome.tabs.onRemoved.addListener((tabId) => {
+  if (navigationTabs.has(tabId)) {
+    navigationTabs.delete(tabId);
+    console.log('BACKGROUND: Cleaned up navigation tab:', tabId);
+  }
+  if (extensionTabs.has(tabId)) {
+    extensionTabs.delete(tabId);
+    console.log('BACKGROUND: Cleaned up extension tab:', tabId);
   }
 });
 
@@ -170,10 +262,75 @@ let websiteBlockerState = {
   customBlockImage: null
 };
 
+// Domain-specific timer visibility state
+let hiddenDomains = new Set(); // Domains where timer has been hidden
+
 // CRITICAL FIX: Debounced saving to prevent quota issues
 let saveTimeout = null;
 let lastSavedState = null;
 let pendingStateChange = false;
+
+// Extract domain from URL for visibility tracking
+function extractDomain(url) {
+  if (!url) return null;
+  try {
+    const urlObj = new URL(url);
+    return urlObj.hostname.replace(/^www\./, ''); // Remove www. prefix
+  } catch (error) {
+    console.error('BACKGROUND: Error extracting domain from URL:', url, error);
+    return null;
+  }
+}
+
+// Check if timer should be visible on a domain
+function isTimerVisibleOnDomain(domain) {
+  if (!domain) return globalTimer.timerVisible; // Fallback to global state
+  // If timer is globally disabled, always hidden
+  if (!globalTimer.enabled) return false;
+  // For domain-specific visibility: if domain is not in hiddenDomains, it's visible
+  // Global timerVisible only matters when there's no domain-specific setting
+  return !hiddenDomains.has(domain);
+}
+
+// Hide timer on a specific domain
+function hideTimerOnDomain(domain) {
+  if (!domain) return;
+  console.log('BACKGROUND: 🙈 Hiding timer on domain:', domain);
+  hiddenDomains.add(domain);
+  saveHiddenDomains();
+}
+
+// Show timer on a specific domain
+function showTimerOnDomain(domain) {
+  if (!domain) return;
+  console.log('BACKGROUND: 👁️ Showing timer on domain:', domain);
+  hiddenDomains.delete(domain);
+  saveHiddenDomains();
+}
+
+// Save hidden domains to storage
+function saveHiddenDomains() {
+  const hiddenDomainsArray = Array.from(hiddenDomains);
+  chrome.storage.sync.set({ hiddenDomains: hiddenDomainsArray }, function() {
+    if (chrome.runtime.lastError) {
+      console.error('BACKGROUND: Error saving hidden domains:', chrome.runtime.lastError);
+    } else {
+      console.log('BACKGROUND: Hidden domains saved:', hiddenDomainsArray);
+    }
+  });
+}
+
+// Load hidden domains from storage
+function loadHiddenDomains() {
+  chrome.storage.sync.get(['hiddenDomains'], function(result) {
+    if (result.hiddenDomains && Array.isArray(result.hiddenDomains)) {
+      hiddenDomains = new Set(result.hiddenDomains);
+      console.log('BACKGROUND: Loaded hidden domains:', Array.from(hiddenDomains));
+    } else {
+      console.log('BACKGROUND: No hidden domains found in storage');
+    }
+  });
+}
 
 // Keep service worker alive
 chrome.runtime.onStartup.addListener(() => {
@@ -271,10 +428,15 @@ chrome.storage.sync.get(['timerState', 'timerDuration', 'timerEnabled', 'timerVi
   setTimeout(() => {
     console.log('BACKGROUND: Force broadcasting initial state to sync all components');
     forceSyncAllTabs();
+    // Set initial badge state
+    updateIconBadge();
   }, 500);
   
   // Initialize standalone audio reminder system after timer initialization
   initializeAudioReminderSystem();
+  
+  // Load domain-specific visibility settings
+  loadHiddenDomains();
 });
 
 // Initialize website blocker from storage
@@ -326,12 +488,22 @@ function initializeAudioReminderSystem() {
   chrome.storage.sync.get(['audioReminderSystem'], function(result) {
     if (result.audioReminderSystem) {
       audioReminderSystem = { ...audioReminderSystem, ...result.audioReminderSystem };
-      console.log('BACKGROUND: 🔊 Loaded standalone audio reminder settings:', audioReminderSystem);
+      console.log('BACKGROUND: 🔊 Loaded standalone audio reminder settings:', {
+        enabled: audioReminderSystem.enabled,
+        frequency: audioReminderSystem.frequency,
+        volume: audioReminderSystem.volume,
+        hasCustomSound: !!audioReminderSystem.customSound,
+        customSoundLength: audioReminderSystem.customSound ? audioReminderSystem.customSound.length : 0
+      });
+    } else {
+      console.log('BACKGROUND: 🔊 No existing audio reminder settings found, using defaults');
     }
     
     // Start audio reminders if enabled and frequency > 0
     if (audioReminderSystem.enabled && audioReminderSystem.frequency > 0) {
       startStandaloneAudioReminders();
+    } else {
+      console.log('BACKGROUND: 🔊 Audio reminders not started - enabled:', audioReminderSystem.enabled, 'frequency:', audioReminderSystem.frequency);
     }
   });
 }
@@ -433,13 +605,22 @@ function fireStandaloneAudioReminder() {
 function sendAudioToSingleTab(tab) {
   console.log('BACKGROUND: 🔔 Sending audio reminder to single tab:', tab.id, '(' + tab.url + ')');
   
-  chrome.tabs.sendMessage(tab.id, {
+  const messageData = {
     action: 'playStandaloneAudioReminder',
     timestamp: Date.now(),
     volume: audioReminderSystem.volume,
     customSound: audioReminderSystem.customSound,
     enabled: audioReminderSystem.enabled
-  }).then(() => {
+  };
+  
+  console.log('BACKGROUND: 🔔 Audio message data:', {
+    enabled: messageData.enabled,
+    volume: messageData.volume,
+    hasCustomSound: !!messageData.customSound,
+    customSoundLength: messageData.customSound ? messageData.customSound.length : 0
+  });
+  
+  chrome.tabs.sendMessage(tab.id, messageData).then(() => {
     console.log('BACKGROUND: ✅ Audio reminder sent successfully to tab', tab.id);
   }).catch((error) => {
     console.log('BACKGROUND: ❌ Failed to send audio reminder to tab', tab.id, ':', error.message);
@@ -452,13 +633,7 @@ function sendAudioToSingleTab(tab) {
         files: ['content.js']
       }).then(() => {
         setTimeout(() => {
-          chrome.tabs.sendMessage(tab.id, {
-            action: 'playStandaloneAudioReminder',
-            timestamp: Date.now(),
-            volume: audioReminderSystem.volume,
-            customSound: audioReminderSystem.customSound,
-            enabled: audioReminderSystem.enabled
-          }).then(() => {
+          chrome.tabs.sendMessage(tab.id, messageData).then(() => {
             console.log('BACKGROUND: ✅ Audio reminder retry successful for tab', tab.id);
           }).catch(() => {
             console.log('BACKGROUND: ❌ Retry audio reminder failed for tab', tab.id, 'using backup');
@@ -552,6 +727,9 @@ function startGlobalTimer() {
     globalTimer.interval = setInterval(() => {
       globalTimer.timeLeft--;
       
+      // Update extension icon badge
+      updateIconBadge();
+      
       // Broadcast to all tabs every second for real-time updates
       broadcastTimerUpdate();
       
@@ -562,20 +740,17 @@ function startGlobalTimer() {
       
       if (globalTimer.timeLeft <= 0) {
         stopGlobalTimer();
-        // Notify completion
-        chrome.tabs.query({}, function(tabs) {
-          tabs.forEach(tab => {
-            chrome.tabs.sendMessage(tab.id, {
-              action: 'timerComplete'
-            }).catch(() => {}); // Ignore errors for inactive tabs
-          });
-        });
+        // Handle timer completion: open new tab and play double beep
+        handleTimerCompletion();
       }
     }, 1000);
   } else { // Stopwatch mode
     globalTimer.isRunning = true;
     globalTimer.interval = setInterval(() => {
       globalTimer.timeLeft++; // Counting up
+      
+      // Update extension icon badge
+      updateIconBadge();
       
       // Broadcast stopwatch updates every second for real-time updates
       broadcastTimerUpdate();
@@ -586,8 +761,10 @@ function startGlobalTimer() {
       }
     }, 1000);
   }
-  startTaskReminder();
+  // REMOVED: startTaskReminder() - now using standalone audio system only
   
+  // Update badge for initial state
+  updateIconBadge();
   debouncedSaveTimerState();
 }
 
@@ -598,8 +775,71 @@ function stopGlobalTimer() {
     clearInterval(globalTimer.interval);
     globalTimer.interval = null;
   }
+  // Update badge when timer stops
+  updateIconBadge();
   debouncedSaveTimerState();
-  stopTaskReminder();
+  // REMOVED: stopTaskReminder() - now using standalone audio system only
+}
+
+// Handle timer completion: open new tab and play double beep
+function handleTimerCompletion() {
+  console.log('BACKGROUND: 🎉 Timer completed! Opening new tab and playing double beep');
+  
+  // Update badge for completion
+  updateIconBadge();
+  
+  // 1. Open new tab automatically
+  try {
+    chrome.tabs.create({
+      url: chrome.runtime.getURL('newtab.html?timerComplete=true'),
+      active: true // Make it the active tab
+    }, (newTab) => {
+      if (chrome.runtime.lastError) {
+        console.error('BACKGROUND: ❌ Could not create completion tab:', chrome.runtime.lastError);
+      } else {
+        console.log('BACKGROUND: ✅ Created timer completion tab:', newTab.id);
+      }
+    });
+  } catch (error) {
+    console.error('BACKGROUND: ❌ Error creating completion tab:', error);
+  }
+  
+  // 2. Play double beep to all tabs
+  console.log('BACKGROUND: 🔔 Playing double beep for timer completion');
+  chrome.tabs.query({ status: 'complete' }, function(tabs) {
+    const validTabs = tabs.filter(tab => 
+      tab.url && 
+      !tab.url.startsWith('chrome://') && 
+      !tab.url.startsWith('chrome-extension://') &&
+      !tab.url.startsWith('moz-extension://')
+    );
+    
+    console.log('BACKGROUND: Sending double beep to', validTabs.length, 'valid tabs');
+    
+    validTabs.forEach(tab => {
+      chrome.tabs.sendMessage(tab.id, {
+        action: 'timerComplete',
+        playDoubleBeep: true,
+        timestamp: Date.now()
+      }).catch(() => {
+        // Silently ignore connection errors to dead tabs
+      });
+    });
+  });
+  
+  // 3. Show completion notification
+  try {
+    chrome.notifications.create({
+      type: 'basic',
+      iconUrl: 'icon/icon128.png',
+      title: '🎉 Timer Complete!',
+      message: 'Great work! Time for a break.',
+      requireInteraction: false,
+      silent: false
+    });
+  } catch (error) {
+    console.error('BACKGROUND: ❌ Could not create completion notification:', error);
+  }
 }
 
 // Reset the global timer
@@ -611,6 +851,8 @@ function resetGlobalTimer() {
   } else {
     globalTimer.timeLeft = 0;
   }
+  // Update badge after reset
+  updateIconBadge();
   broadcastTimerUpdate();
   debouncedSaveTimerState();
 }
@@ -629,27 +871,92 @@ function broadcastTimerUpdate(source = null) {
     
     console.log('BACKGROUND: Found', validTabs.length, 'valid tabs to update (filtered from', tabs.length, 'total)');
     
-    const message = {
-      action: 'updateTimerDisplay',
-      timeLeft: globalTimer.timeLeft,
-      isRunning: globalTimer.isRunning,
-      enabled: globalTimer.enabled,
-      timerVisible: globalTimer.timerVisible,
-      currentTask: globalTimer.currentTask,
-      mode: globalTimer.mode,
-      stopwatch: stopwatch,
-      reminderFrequency: globalTimer.reminderFrequency,
-      customReminderSound: globalTimer.customReminderSound,
-      reminderVolume: globalTimer.reminderVolume,
-      reminderEnabled: globalTimer.reminderEnabled,
-      disableSource: source
-    };
-    
     validTabs.forEach(tab => {
+      const domain = extractDomain(tab.url);
+      const domainVisible = isTimerVisibleOnDomain(domain);
+      
+      const message = {
+        action: 'updateTimerDisplay',
+        timeLeft: globalTimer.timeLeft,
+        isRunning: globalTimer.isRunning,
+        enabled: globalTimer.enabled,
+        timerVisible: domainVisible, // Use domain-specific visibility
+        currentTask: globalTimer.currentTask,
+        mode: globalTimer.mode,
+        stopwatch: stopwatch,
+        reminderFrequency: globalTimer.reminderFrequency,
+        customReminderSound: globalTimer.customReminderSound,
+        reminderVolume: globalTimer.reminderVolume,
+        reminderEnabled: globalTimer.reminderEnabled,
+        disableSource: source,
+        domain: domain
+      };
+      
       chrome.tabs.sendMessage(tab.id, message).catch(() => {
         // Silently ignore connection errors to dead tabs
       });
     });
+  });
+}
+
+// Broadcast timer update to tabs on a specific domain
+function broadcastTimerUpdateToDomain(domain, source = '') {
+  console.log('BACKGROUND: Broadcasting timer update to domain:', domain);
+  
+  chrome.tabs.query({}, (tabs) => {
+    let domainTabsCount = 0;
+    let messagesInjected = 0;
+    
+    tabs.forEach(async (tab) => {
+      if (tab.url && extractDomain(tab.url) === domain) {
+        domainTabsCount++;
+        
+        const timerVisible = isTimerVisibleOnDomain(domain);
+        console.log(`BACKGROUND: Sending update to tab ${tab.id} on ${domain}, timerVisible:`, timerVisible);
+        
+        try {
+          // Check if content script is ready by pinging first
+          chrome.tabs.sendMessage(tab.id, { action: 'ping' }, (response) => {
+            if (chrome.runtime.lastError) {
+              console.log(`BACKGROUND: Tab ${tab.id} not ready for ping, might need injection`);
+              return;
+            }
+            
+            // Send the actual update
+            chrome.tabs.sendMessage(tab.id, {
+              action: 'updateTimerDisplay',
+              enabled: globalTimer.enabled,
+              isRunning: globalTimer.isRunning,
+              timeLeft: globalTimer.timeLeft,
+              mode: globalTimer.mode,
+              timerVisible: timerVisible,
+              currentTask: globalTimer.currentTask,
+              reminderFrequency: globalTimer.reminderFrequency,
+              reminderEnabled: globalTimer.reminderEnabled,
+              reminderVolume: globalTimer.reminderVolume,
+              customReminderSound: globalTimer.customReminderSound,
+              stopwatch: globalTimer.stopwatch,
+              disableSource: source + '-domainUpdate',
+              domain: domain
+            }, (updateResponse) => {
+              if (chrome.runtime.lastError) {
+                console.warn(`BACKGROUND: Failed to send timer update to tab ${tab.id}:`, chrome.runtime.lastError.message);
+              } else {
+                messagesInjected++;
+                console.log(`BACKGROUND: Successfully sent timer update to tab ${tab.id}, response:`, updateResponse);
+              }
+            });
+          });
+        } catch (error) {
+          console.error(`BACKGROUND: Error broadcasting to tab ${tab.id}:`, error);
+        }
+      }
+    });
+    
+    console.log(`BACKGROUND: Broadcast to ${domainTabsCount} tabs on domain ${domain}`);
+    setTimeout(() => {
+      console.log(`BACKGROUND: Successfully sent messages to ${messagesInjected}/${domainTabsCount} tabs on ${domain}`);
+    }, 100);
   });
 }
 
@@ -665,22 +972,26 @@ function forceSyncAllTabs() {
       !tab.url.startsWith('moz-extension://')
     );
     
-    const message = {
-      action: 'forceStateSync',
-      timeLeft: globalTimer.timeLeft,
-      isRunning: globalTimer.isRunning,
-      enabled: globalTimer.enabled,
-      timerVisible: globalTimer.timerVisible,
-      currentTask: globalTimer.currentTask,
-      mode: globalTimer.mode,
-      stopwatch: stopwatch,
-      reminderFrequency: globalTimer.reminderFrequency,
-      customReminderSound: globalTimer.customReminderSound,
-      reminderVolume: globalTimer.reminderVolume,
-      reminderEnabled: globalTimer.reminderEnabled
-    };
-    
     validTabs.forEach(tab => {
+      const domain = extractDomain(tab.url);
+      const domainVisible = isTimerVisibleOnDomain(domain);
+      
+      const message = {
+        action: 'forceStateSync',
+        timeLeft: globalTimer.timeLeft,
+        isRunning: globalTimer.isRunning,
+        enabled: globalTimer.enabled,
+        timerVisible: domainVisible, // Use domain-specific visibility
+        currentTask: globalTimer.currentTask,
+        mode: globalTimer.mode,
+        stopwatch: stopwatch,
+        reminderFrequency: globalTimer.reminderFrequency,
+        customReminderSound: globalTimer.customReminderSound,
+        reminderVolume: globalTimer.reminderVolume,
+        reminderEnabled: globalTimer.reminderEnabled,
+        domain: domain
+      };
+      
       chrome.tabs.sendMessage(tab.id, message).catch(() => {
         // Silently ignore connection errors
       });
@@ -710,196 +1021,6 @@ function stopStopwatch() {
     stopwatch.interval = null;
   }
   debouncedSaveTimerState();
-}
-
-function startTaskReminder() {
-    console.log('BACKGROUND: Starting task reminder with settings:', {
-        currentTask: globalTimer.currentTask,
-        isRunning: globalTimer.isRunning,
-        reminderFrequency: globalTimer.reminderFrequency,
-        reminderEnabled: globalTimer.reminderEnabled
-    });
-    
-    stopTaskReminder(); // Stop any existing reminder
-    
-    // Check all conditions for reminder
-    if (!globalTimer.isRunning) {
-        console.log('BACKGROUND: Timer not running - reminder not started');
-        return;
-    }
-    if (globalTimer.reminderFrequency === 0) {
-        console.log('BACKGROUND: Reminder frequency is 0 - reminder not started');
-        return;
-    }
-    if (!globalTimer.reminderEnabled) {
-        console.log('BACKGROUND: Reminder disabled - reminder not started');
-        return;
-    }
-    
-    // ✅ FIXED: Allow reminders even without a task (generic focus reminders)
-    const effectiveTask = globalTimer.currentTask || 'Stay Focused';
-    console.log('BACKGROUND: ✅ All conditions met! Using task:', effectiveTask);
-
-    const reminderIntervalMs = globalTimer.reminderFrequency * 60 * 1000;
-    console.log('BACKGROUND: ✅ Starting reminder interval every', globalTimer.reminderFrequency, 'minutes (', reminderIntervalMs, 'ms)');
-    
-    taskReminderInterval = setInterval(() => {
-        console.log('BACKGROUND: 🔔 FIRING REMINDER - sending remindTask to all tabs');
-        
-        // Check if reminder should still fire
-        if (!globalTimer.isRunning || globalTimer.reminderFrequency === 0 || !globalTimer.reminderEnabled) {
-            console.log('BACKGROUND: ❌ Reminder conditions no longer met, stopping reminders');
-            stopTaskReminder();
-            return;
-        }
-        
-        const currentEffectiveTask = globalTimer.currentTask || 'Stay Focused';
-        
-        chrome.tabs.query({}, function(tabs) {
-            if (chrome.runtime.lastError) {
-                console.error('BACKGROUND: ❌ Error querying tabs:', chrome.runtime.lastError);
-                return;
-            }
-            
-            const validTabs = tabs.filter(tab => 
-                tab.url && 
-                !tab.url.startsWith('chrome://') && 
-                !tab.url.startsWith('chrome-extension://') &&
-                !tab.url.startsWith('moz-extension://') &&
-                !tab.url.startsWith('about:') &&
-                !tab.url.startsWith('data:')
-            );
-            
-            console.log('BACKGROUND: Sending reminder to', validTabs.length, 'valid tabs out of', tabs.length, 'total tabs');
-            
-            if (validTabs.length === 0) {
-                console.log('BACKGROUND: ⚠️ No valid tabs found for reminder - using backup systems');
-                
-                // Multiple backup systems when no content scripts available
-                try {
-                    // 1. Browser notification with sound
-                    chrome.notifications.create({
-                        type: 'basic',
-                        iconUrl: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="%234CAF50"/></svg>',
-                        title: '🔔 Focus Reminder',
-                        message: `Remember: ${currentEffectiveTask}`,
-                        requireInteraction: false,
-                        silent: false // This should play system notification sound
-                    });
-                    console.log('BACKGROUND: ✅ Backup notification created');
-                } catch (notificationError) {
-                    console.error('BACKGROUND: ❌ Could not create backup notification:', notificationError);
-                }
-                
-                // 2. Try to create a new tab with timer that can play audio
-                try {
-                    chrome.tabs.create({
-                        url: chrome.runtime.getURL('newtab.html?reminder=true'),
-                        active: false // Don't switch to the tab
-                    }, (newTab) => {
-                        if (chrome.runtime.lastError) {
-                            console.error('BACKGROUND: ❌ Could not create backup audio tab:', chrome.runtime.lastError);
-                        } else {
-                            console.log('BACKGROUND: ✅ Created backup audio tab:', newTab.id);
-                            // Send reminder message after a short delay
-                            setTimeout(() => {
-                                chrome.tabs.sendMessage(newTab.id, {
-                                    action: 'remindTask',
-                                    timestamp: Date.now(),
-                                    currentTask: currentEffectiveTask,
-                                    reminderVolume: globalTimer.reminderVolume,
-                                    customReminderSound: globalTimer.customReminderSound,
-                                    reminderEnabled: globalTimer.reminderEnabled,
-                                    forcePlay: true,
-                                    isBackupTab: true
-                                }).catch(() => {
-                                    console.log('BACKGROUND: ❌ Backup tab reminder failed, closing tab');
-                                    chrome.tabs.remove(newTab.id);
-                                });
-                            }, 1000);
-                            
-                            // Close the backup tab after 5 seconds
-                            setTimeout(() => {
-                                chrome.tabs.remove(newTab.id).catch(() => {});
-                            }, 5000);
-                        }
-                    });
-                } catch (tabError) {
-                    console.error('BACKGROUND: ❌ Could not create backup tab:', tabError);
-                }
-            }
-            
-            let successCount = 0;
-            let errorCount = 0;
-            
-            validTabs.forEach((tab, index) => {
-                // Add small delay between messages to prevent rate limiting
-                setTimeout(() => {
-                    chrome.tabs.sendMessage(tab.id, { 
-                        action: 'remindTask',
-                        timestamp: Date.now(),
-                        currentTask: currentEffectiveTask,
-                        reminderVolume: globalTimer.reminderVolume,
-                        customReminderSound: globalTimer.customReminderSound,
-                        reminderEnabled: globalTimer.reminderEnabled,
-                        forcePlay: true // Flag to force audio even if timer not visible
-                    }).then(() => {
-                        successCount++;
-                        console.log('BACKGROUND: ✅ Reminder sent to tab', tab.id, '(' + tab.url.substring(0, 50) + '...)');
-                    }).catch((error) => {
-                        errorCount++;
-                        console.log('BACKGROUND: ❌ Failed to send reminder to tab', tab.id, '(' + tab.url.substring(0, 50) + '):', error.message);
-                        
-                        // Try injecting content script if it's missing
-                        if (error.message.includes('Receiving end does not exist')) {
-                            console.log('BACKGROUND: 🔄 Attempting to inject content script into tab', tab.id);
-                            chrome.scripting.executeScript({
-                                target: { tabId: tab.id },
-                                files: ['content.js']
-                            }).then(() => {
-                                console.log('BACKGROUND: ✅ Content script injected, retrying reminder...');
-                                // Retry sending the message after injection
-                                setTimeout(() => {
-                                    chrome.tabs.sendMessage(tab.id, { 
-                                        action: 'remindTask',
-                                        timestamp: Date.now(),
-                                        currentTask: currentEffectiveTask,
-                                        reminderVolume: globalTimer.reminderVolume,
-                                        customReminderSound: globalTimer.customReminderSound,
-                                        reminderEnabled: globalTimer.reminderEnabled,
-                                        forcePlay: true,
-                                        retryAfterInjection: true
-                                    }).catch(() => {
-                                        console.log('BACKGROUND: ❌ Retry failed for tab', tab.id);
-                                    });
-                                }, 500);
-                            }).catch((injectionError) => {
-                                console.log('BACKGROUND: ❌ Could not inject content script into tab', tab.id, ':', injectionError.message);
-                            });
-                        }
-                    });
-                }, index * 50); // 50ms delay between each message
-            });
-            
-            // Log summary after all messages are processed
-            setTimeout(() => {
-                console.log('BACKGROUND: 📊 Reminder summary - Success:', successCount, 'Errors:', errorCount);
-            }, validTabs.length * 50 + 100);
-        });
-    }, reminderIntervalMs);
-    
-    console.log('BACKGROUND: Reminder interval established with ID:', taskReminderInterval);
-}
-
-function stopTaskReminder() {
-    console.log('BACKGROUND: Stopping task reminder, current interval ID:', taskReminderInterval);
-    if (taskReminderInterval) {
-        clearInterval(taskReminderInterval); // FIX: Use clearInterval instead of clearTimeout
-        taskReminderInterval = null;
-        console.log('BACKGROUND: ✅ Task reminder stopped and cleared');
-    } else {
-        console.log('BACKGROUND: No active reminder to stop');
-    }
 }
 
 // Save timer state to storage
@@ -1143,12 +1264,20 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
       break;
       
     case 'getTimerState':
+      // Get domain-specific visibility if sender tab is available
+      let timerVisible = globalTimer.timerVisible; // Default fallback
+      if (sender.tab && sender.tab.url) {
+        const domain = extractDomain(sender.tab.url);
+        timerVisible = isTimerVisibleOnDomain(domain);
+        console.log('BACKGROUND: getTimerState for domain:', domain, 'visible:', timerVisible);
+      }
+      
       const state = {
         timeLeft: globalTimer.timeLeft,
         isRunning: globalTimer.isRunning,
         defaultTime: globalTimer.defaultTime,
         enabled: globalTimer.enabled,
-        timerVisible: globalTimer.timerVisible, // Include the new state
+        timerVisible: timerVisible, // Use domain-specific visibility
         currentTask: globalTimer.currentTask,
         mode: globalTimer.mode,
         reminderFrequency: globalTimer.reminderFrequency,
@@ -1210,6 +1339,8 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
         globalTimer.mode = 'pomodoro';
         globalTimer.timeLeft = globalTimer.defaultTime;
       }
+      // Update badge when mode changes
+      updateIconBadge();
       broadcastTimerUpdate();
       debouncedSaveTimerState();
       sendResponse({ success: true, mode: globalTimer.mode });
@@ -1235,21 +1366,8 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
         globalTimer.timerVisible = true;
       }
       
-      // ✅ FIXED: Start reminders based on timer state, not requiring a task
-      if (globalTimer.isRunning && globalTimer.reminderFrequency > 0 && globalTimer.reminderEnabled) {
-          console.log('BACKGROUND: ✅ Starting reminders - task:', globalTimer.currentTask || 'Stay Focused');
-          startTaskReminder();
-      } else {
-          console.log('BACKGROUND: Stopping reminders:', {
-              isRunning: globalTimer.isRunning,
-              frequency: globalTimer.reminderFrequency,
-              enabled: globalTimer.reminderEnabled,
-              reason: !globalTimer.isRunning ? 'not running' : 
-                     globalTimer.reminderFrequency === 0 ? 'frequency is 0' : 
-                     !globalTimer.reminderEnabled ? 'reminders disabled' : 'unknown'
-          });
-          stopTaskReminder();
-      }
+      // ✅ FIXED: No longer starting old task reminder system - using standalone audio only
+      console.log('BACKGROUND: ✅ Task set successfully - standalone audio reminder system handles audio');
       debouncedSaveTimerState();
       broadcastTimerUpdate();
       sendResponse({ success: true, task: globalTimer.currentTask });
@@ -1266,18 +1384,65 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
         // When enabled via popup, make timer visible
         globalTimer.timerVisible = true;
       }
+      // Update badge when enabled state changes
+      updateIconBadge();
       debouncedSaveTimerState();
       broadcastTimerUpdate(request.source === 'popupToggle' ? 'popupToggle' : request.source);
       sendResponse({ success: true, enabled: globalTimer.enabled, timerVisible: globalTimer.timerVisible });
       break;
       
     case 'toggleVisible':
-      // This is for the X button - only controls visibility, not enabled state
-      console.log('BACKGROUND: Toggle visible from', globalTimer.timerVisible, 'to', request.visible, 'source:', request.source);
-      globalTimer.timerVisible = request.visible;
-      debouncedSaveTimerState();
-      broadcastTimerUpdate(request.source);
-      sendResponse({ success: true, enabled: globalTimer.enabled, timerVisible: globalTimer.timerVisible });
+      // This is for the X button - domain-specific visibility control
+      console.log('BACKGROUND: 🔄 Toggle visible from', globalTimer.timerVisible, 'to', request.visible, 'source:', request.source);
+      
+      if (sender.tab && sender.tab.url) {
+        const domain = extractDomain(sender.tab.url);
+        console.log('BACKGROUND: 📍 Domain extracted for visibility toggle:', domain, 'URL:', sender.tab.url);
+        
+        if (domain) {
+          const wasVisibleBefore = isTimerVisibleOnDomain(domain);
+          console.log('BACKGROUND: 📊 Before toggle - domain visibility:', wasVisibleBefore, 'hiddenDomains:', Array.from(hiddenDomains));
+          
+          if (request.visible) {
+            console.log('BACKGROUND: ✅ Showing timer on domain:', domain);
+            showTimerOnDomain(domain);
+          } else {
+            console.log('BACKGROUND: ❌ Hiding timer on domain:', domain);
+            hideTimerOnDomain(domain);
+          }
+          
+          const isVisibleAfter = isTimerVisibleOnDomain(domain);
+          console.log('BACKGROUND: 📊 After toggle - domain visibility:', isVisibleAfter, 'hiddenDomains:', Array.from(hiddenDomains));
+          console.log('BACKGROUND: 🚀 Broadcasting update to domain:', domain, 'with timerVisible:', isVisibleAfter);
+          
+          // Broadcast update only to tabs on the same domain
+          broadcastTimerUpdateToDomain(domain, request.source);
+          
+          // Send immediate response
+          sendResponse({ 
+            success: true, 
+            enabled: globalTimer.enabled, 
+            timerVisible: isVisibleAfter, 
+            domain: domain,
+            action: request.visible ? 'show' : 'hide',
+            wasVisible: wasVisibleBefore
+          });
+        } else {
+          console.warn('BACKGROUND: ⚠️ Domain extraction failed, falling back to global behavior');
+          // Fallback to global behavior if domain extraction fails
+          globalTimer.timerVisible = request.visible;
+          debouncedSaveTimerState();
+          broadcastTimerUpdate(request.source);
+          sendResponse({ success: true, enabled: globalTimer.enabled, timerVisible: globalTimer.timerVisible, fallback: true });
+        }
+      } else {
+        console.warn('BACKGROUND: ⚠️ No tab info available, falling back to global behavior');
+        // Fallback to global behavior if no tab info
+        globalTimer.timerVisible = request.visible;
+        debouncedSaveTimerState();
+        broadcastTimerUpdate(request.source);
+        sendResponse({ success: true, enabled: globalTimer.enabled, timerVisible: globalTimer.timerVisible, fallback: true });
+      }
       break;
       
     case 'getEnabled':
@@ -1298,9 +1463,10 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
       console.log('BACKGROUND: Updating reminder frequency to', request.frequency);
       globalTimer.reminderFrequency = request.frequency;
       if (globalTimer.isRunning && globalTimer.reminderEnabled && globalTimer.reminderFrequency > 0) {
-        startTaskReminder(); // Restart with new frequency
+        // The standalone audio system handles reminders, so no need to restart here
       } else {
-        stopTaskReminder(); // Stop if frequency is 0
+        // If frequency is 0, stop reminders
+        stopStandaloneAudioReminders();
       }
       debouncedSaveTimerState();
       broadcastTimerUpdate();
@@ -1334,9 +1500,9 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
         console.log('BACKGROUND: Toggling reminder enabled to', request.enabled);
         globalTimer.reminderEnabled = request.enabled;
         if (!request.enabled) {
-            stopTaskReminder(); // Stop reminders if disabled
+            stopStandaloneAudioReminders(); // Stop reminders if disabled
         } else if (globalTimer.isRunning && globalTimer.reminderFrequency > 0) {
-            startTaskReminder(); // Start reminders if enabled and conditions are met
+            startStandaloneAudioReminders(); // Start reminders if enabled and conditions are met
         }
         debouncedSaveTimerState();
         broadcastTimerUpdate();
@@ -1379,7 +1545,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
         break;
         
     case 'setStandaloneAudioCustomSound':
-        console.log('BACKGROUND: 🔊 Setting standalone audio custom sound');
+        console.log('BACKGROUND: �� Setting standalone audio custom sound');
         audioReminderSystem.customSound = request.sound;
         saveAudioReminderSettings();
         sendResponse({ success: true });
@@ -1511,3 +1677,44 @@ chrome.runtime.onSuspend.addListener(function() {
   // Force immediate save on suspend - no debouncing
   saveTimerState();
 });
+
+// =====================================
+// EXTENSION ICON BADGE FUNCTIONS
+// =====================================
+
+// Update extension icon badge with current timer minutes
+function updateIconBadge() {
+  if (!globalTimer.enabled) {
+    // Clear badge when timer is disabled
+    chrome.action.setBadgeText({ text: '' });
+    chrome.action.setBadgeBackgroundColor({ color: '#FFA500' });
+    return;
+  }
+  
+  let minutes;
+  let badgeColor = '#FFA500'; // Default orange
+  
+  if (globalTimer.mode === 'pomodoro') {
+    minutes = Math.ceil(Math.max(0, globalTimer.timeLeft) / 60);
+    if (globalTimer.isRunning) {
+      badgeColor = globalTimer.timeLeft <= 300 ? '#FF4444' : '#FFA500'; // Red if ≤5 minutes, orange otherwise
+    } else {
+      badgeColor = '#888888'; // Gray when paused
+    }
+  } else { // stopwatch mode
+    minutes = Math.floor(globalTimer.timeLeft / 60);
+    badgeColor = globalTimer.isRunning ? '#00AA00' : '#888888'; // Green when running, gray when paused
+  }
+  
+  // Limit display to 99+ for large numbers
+  const badgeText = minutes > 99 ? '99+' : minutes.toString();
+  
+  console.log('BACKGROUND: 🏷️ Updating badge:', badgeText, 'minutes, color:', badgeColor);
+  
+  chrome.action.setBadgeText({ text: badgeText });
+  chrome.action.setBadgeBackgroundColor({ color: badgeColor });
+}
+
+// =====================================
+// END EXTENSION ICON BADGE FUNCTIONS
+// =====================================

@@ -1789,11 +1789,23 @@ function uploadCustomAudio() {
         const file = e.target.files[0];
         if (!file) return;
 
-        console.log('POPUP.JS: 🔊 Processing uploaded audio file:', file.name);
+        console.log('POPUP.JS: 🔊 Processing uploaded audio file:', file.name, 'Size:', Math.round(file.size / 1024), 'KB');
+        
+        // Check file size (Chrome storage limit is ~100KB for sync storage)
+        const maxSizeKB = 80; // Conservative limit
+        const fileSizeKB = file.size / 1024;
+        
+        if (fileSizeKB > maxSizeKB) {
+            alert(`Audio file is too large (${Math.round(fileSizeKB)}KB). Please use a file smaller than ${maxSizeKB}KB.`);
+            console.error('POPUP.JS: 🔊 Audio file too large:', fileSizeKB, 'KB, max allowed:', maxSizeKB, 'KB');
+            return;
+        }
         
         const reader = new FileReader();
         reader.onload = (event) => {
             const soundDataUrl = event.target.result;
+            
+            console.log('POPUP.JS: 🔊 Audio file converted to data URL, length:', soundDataUrl.length);
             
             // Update local state immediately
             standaloneHasCustomSound = true;
@@ -1817,9 +1829,18 @@ function uploadCustomAudio() {
                     // Revert on error
                     standaloneHasCustomSound = false;
                     updateStandaloneReminderUI();
+                    alert('Failed to upload audio. Please try a smaller file.');
+                } else {
+                    console.log('POPUP.JS: 🔊 ✅ Custom audio uploaded successfully');
                 }
             });
         };
+        
+        reader.onerror = () => {
+            console.error('POPUP.JS: 🔊 Error reading audio file');
+            alert('Error reading audio file. Please try again.');
+        };
+        
         reader.readAsDataURL(file);
     };
     input.click();

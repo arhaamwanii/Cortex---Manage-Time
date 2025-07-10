@@ -265,18 +265,22 @@ function createReEnableDot() {
   reEnableDot.style.display = 'none'; // Hidden by default
   
   reEnableDot.onclick = () => {
-    console.log('CONTENT: Re-enable dot clicked - showing timer');
+    console.log('CONTENT: 🔄 Re-enable dot clicked - showing timer on domain:', window.location.hostname);
     chrome.runtime.sendMessage({ action: 'toggleVisible', visible: true, source: 'reEnableDot' }, function(response) {
       if (chrome.runtime.lastError) {
-        console.error('CONTENT: Error showing timer:', chrome.runtime.lastError);
+        console.error('CONTENT: ❌ Error showing timer:', chrome.runtime.lastError);
         // Retry after delay
         setTimeout(() => {
-          console.log('CONTENT: Retrying show after error...');
+          console.log('CONTENT: 🔄 Retrying show after error...');
           chrome.runtime.sendMessage({ action: 'toggleVisible', visible: true, source: 'reEnableDot' });
         }, 1000);
         return;
       }
-      console.log('CONTENT: Re-enable response:', response);
+      console.log('CONTENT: ✅ Re-enable response received:', response);
+      // Additional debug logging
+      if (response) {
+        console.log('CONTENT: 📊 Response details - success:', response.success, 'enabled:', response.enabled, 'timerVisible:', response.timerVisible, 'domain:', response.domain, 'wasVisible:', response.wasVisible);
+      }
       // TIMER IS AUTHORITY: Report immediately that we're being shown
       setTimeout(() => {
         reportActualTimerState();
@@ -1044,6 +1048,9 @@ function reportActualTimerState() {
 chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
   switch(request.action) {
     case 'updateTimerDisplay':
+      console.log('CONTENT: 📥 Received updateTimerDisplay - enabled:', request.enabled, 'timerVisible:', request.timerVisible, 'source:', request.disableSource, 'domain:', request.domain);
+      console.log('CONTENT: 📊 Current element states - hasTimerElement:', !!timerElement, 'hasReEnableDot:', !!reEnableDot, 'isNewTab:', isNewTabPage());
+      
       updateDisplay(request.timeLeft, request.mode);
       updateStartButton(request.isRunning);
       updateTaskDisplay(request.currentTask, request.isRunning, request.mode);
@@ -1057,11 +1064,11 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
       }
       
       // Handle timer visibility based on both enabled and timerVisible states
-      console.log('CONTENT: received updateTimerDisplay, enabled:', request.enabled, 'timerVisible:', request.timerVisible);
+      console.log('CONTENT: Processing visibility - enabled:', request.enabled, 'timerVisible:', request.timerVisible, 'hasTimerElement:', !!timerElement, 'hasReEnableDot:', !!reEnableDot);
       
       if (!request.enabled) {
         // Timer is completely disabled - remove everything
-        console.log('CONTENT: Timer is disabled - removing everything');
+        console.log('CONTENT: ❌ Timer is disabled - removing everything');
         if (timerElement) {
           timerElement.remove();
           timerElement = null;
@@ -1069,7 +1076,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
         if (reEnableDot) reEnableDot.style.display = 'none';
       } else if (request.enabled && request.timerVisible) {
         // Timer is enabled and should be visible
-        console.log('CONTENT: Timer is enabled and visible - showing timer');
+        console.log('CONTENT: ✅ Timer is enabled and visible - showing timer, hiding dot');
         if (!timerElement) {
           console.log('CONTENT: Creating timer element (was removed)');
           createTimerElement();
@@ -1079,7 +1086,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
         if (reEnableDot) reEnableDot.style.display = 'none';
       } else if (request.enabled && !request.timerVisible) {
         // Timer is enabled but hidden (X button was clicked)
-        console.log('CONTENT: Timer is enabled but hidden - showing re-enable dot');
+        console.log('CONTENT: 🟡 Timer is enabled but hidden - removing timer, showing dot');
         if (timerElement) {
           timerElement.remove();
           timerElement = null;
@@ -1236,21 +1243,27 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
       break;
 
     case 'timerComplete':
-      // Play a sound
-      playSound();
+      // Play timer completion sound
+      if (request.playDoubleBeep) {
+        console.log('CONTENT: 🔔 Playing double beep for timer completion');
+        playDoubleBeep();
+      } else {
+        playSound();
+      }
+      
       // Timer completed notification - only request permission when needed
       if (Notification.permission === 'default') {
         Notification.requestPermission().then(permission => {
           if (permission === 'granted') {
-            new Notification('CORTEX Timer', {
-              body: 'Time is up! Take a break.',
+            new Notification('🎉 Timer Complete!', {
+              body: 'Great work! Time for a break.',
               icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="%234CAF50"/></svg>'
             });
           }
         });
       } else if (Notification.permission === 'granted') {
-        new Notification('CORTEX Timer', {
-          body: 'Time is up! Take a break.',
+        new Notification('🎉 Timer Complete!', {
+          body: 'Great work! Time for a break.',
           icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="%234CAF50"/></svg>'
         });
       }
@@ -1275,6 +1288,41 @@ function playSound() {
   // Play and stop the sound
   oscillator.start(audioCtx.currentTime);
   oscillator.stop(audioCtx.currentTime + 0.5); // Play for 0.5 seconds
+}
+
+// Function to play a double beep
+function playDoubleBeep() {
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const oscillator = audioCtx.createOscillator();
+  const gainNode = audioCtx.createGain();
+
+  oscillator.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+
+  // Sound characteristics
+  oscillator.type = 'sine'; // 'sine', 'square', 'sawtooth', 'triangle'
+  oscillator.frequency.setValueAtTime(440, audioCtx.currentTime); // A4 note
+  gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
+
+  // Play and stop the sound
+  oscillator.start(audioCtx.currentTime);
+  oscillator.stop(audioCtx.currentTime + 0.5); // Play for 0.5 seconds
+
+  // Play a second beep slightly delayed
+  setTimeout(() => {
+    const oscillator2 = audioCtx.createOscillator();
+    const gainNode2 = audioCtx.createGain();
+
+    oscillator2.connect(gainNode2);
+    gainNode2.connect(audioCtx.destination);
+
+    oscillator2.type = 'sine';
+    oscillator2.frequency.setValueAtTime(440, audioCtx.currentTime);
+    gainNode2.gain.setValueAtTime(0.5, audioCtx.currentTime);
+
+    oscillator2.start(audioCtx.currentTime);
+    oscillator2.stop(audioCtx.currentTime + 0.5);
+  }, 500); // 500ms delay
 }
 
 // Initialize when DOM is ready

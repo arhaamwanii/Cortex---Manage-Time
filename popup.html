@@ -63,7 +63,47 @@
             display: flex;
             align-items: center;
             gap: 12px;
-            margin-bottom: 8px;
+            margin-bottom: 20px;
+            justify-content: space-between;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .coffee-btn {
+            background: #f8f8f8;
+            border: 1px solid #e5e5e5;
+            border-radius: 8px;
+            padding: 3px 6px;
+            font-size: 10px;
+            font-weight: 400;
+            color: #777;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            display: inline-block;
+            opacity: 0.7;
+        }
+
+        .coffee-btn:hover {
+            background: #f0f0f0;
+            border-color: #ddd;
+            color: #555;
+            opacity: 1;
+            transform: none;
+        }
+
+        .coffee-btn:active {
+            transform: scale(0.98);
         }
 
         .logo {
@@ -80,12 +120,21 @@
             font-size: 24px;
             font-weight: 700;
             color: #FFA500;
+            margin: 0;
+        }
+
+        .title-container {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0;
         }
 
         .subtitle {
             color: #888;
-            margin-bottom: 24px;
+            margin: 0;
             font-size: 13px;
+            line-height: 1;
         }
 
         /* Timer Display Section */
@@ -94,6 +143,7 @@
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 12px;
             padding: 20px;
+            margin-top: 8px;
             margin-bottom: 20px;
             text-align: center;
         }
@@ -939,16 +989,60 @@
             color: #666;
             font-size: 10px;
         }
+
+        .footer {
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 16px 0 8px 0;
+            margin-top: 24px;
+            text-align: center;
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 8px;
+        }
+
+        .footer-link {
+            color: #888;
+            text-decoration: none;
+            font-size: 12px;
+            padding: 6px 8px;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .footer-link:hover {
+            color: #FFA500;
+            background: rgba(255, 165, 0, 0.1);
+        }
+
+        .footer-text {
+            color: #666;
+            font-size: 10px;
+            line-height: 1.4;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <div class="logo"></div>
-            <h1 class="title">Elevate</h1>
+            <div class="header-left">
+                <div class="logo"></div>
+                <div class="title-container">
+                    <h1 class="title">Elevate</h1>
+                    <p class="subtitle">Rise Above Distractions</p>
+                </div>
+            </div>
+            <div class="header-right">
+                <a href="https://www.buymeacoffee.com/aminwani" target="_blank" class="coffee-btn">Buy Me a Coffee</a>
+            </div>
         </div>
-        
-        <p class="subtitle">Rise Above Distractions</p>
         
         <!-- Timer Display & Controls -->
         <div class="timer-section">
@@ -1094,6 +1188,24 @@
                         <span class="status-text" id="newtabStatusText">Checking...</span>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <div class="footer-links">
+                <a href="https://github.com/arhaamwanii/Elevate" target="_blank" class="footer-link">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                    </svg>
+                    <span>Open Source</span>
+                </a>
+                <a href="https://www.buymeacoffee.com/aminwani" target="_blank" class="footer-link">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M20.216 6.415l-.132-.666c-.119-.598-.388-1.163-.766-1.688C18.85 3.226 18.11 2.56 17.2 2.223c-.834-.308-1.748-.462-2.717-.462H6.104c-.969 0-1.883.154-2.717.462C2.477 2.56 1.737 3.226 1.269 4.061c-.378.525-.647 1.09-.766 1.688L.371 6.415c-.118.593-.118 1.177 0 1.77l.132.666c.119.598.388 1.163.766 1.688.468.835 1.208 1.501 2.118 1.838.834.308 1.748.462 2.717.462h8.379c.969 0 1.883-.154 2.717-.462.91-.337 1.65-1.003 2.118-1.838.378-.525.647-1.09.766-1.688l.132-.666c.118-.593.118-1.177 0-1.77zM5.5 7c-.552 0-1-.448-1-1s.448-1 1-1 1 .448 1 1-.448 1-1 1zm7.5 9c-3.033 0-5.5-2.467-5.5-5.5s2.467-5.5 5.5-5.5 5.5 2.467 5.5 5.5-2.467 5.5-5.5 5.5z"/>
+                        <circle cx="13" cy="10.5" r="2.5" fill="white"/>
+                    </svg>
+                    <span>Buy Me a Coffee</span>
+                </a>
             </div>
         </div>
     </div>
