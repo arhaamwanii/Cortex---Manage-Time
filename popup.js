@@ -1,5 +1,5 @@
 // Elevate Popup Controller - Full Timer Control Interface v2.1 (Cache Bust)
-console.log('POPUP.JS: Script loaded and executing v2.1 - Cache Busted!');
+console.log('POPUP.JS: Script loaded and executing v3.0 - Enhanced UI Feedback!');
 
 // State variables
 let timerEnabled = null;
@@ -35,7 +35,7 @@ let popularSites = [
 
 // Wait for DOM to be fully loaded with better detection
 function initializePopup() {
-    console.log('POPUP.JS: Initializing popup with DOM fully ready v2.1...');
+    console.log('POPUP.JS: Initializing popup with DOM fully ready v3.0...');
     
     // Add comprehensive DOM debugging
     console.log('POPUP.JS: DOM state check:', {
@@ -89,8 +89,8 @@ function initializePopup() {
         return;
     }
     
-    console.log('POPUP.JS: All critical elements found, proceeding with initialization v2.1...');
-    console.log('🎉 POPUP.JS: CACHE BUST SUCCESSFUL - All fixes are now active!');
+    console.log('POPUP.JS: All critical elements found, proceeding with initialization v3.0...');
+    console.log('🎉 POPUP.JS: v3.0 ENHANCED UI FEEDBACK ACTIVE - All instant feedback features loaded!');
     
     // Setup event listeners first (synchronous)
     setupEventListeners();
@@ -678,119 +678,272 @@ function setupBlockerEventListeners() {
 }
 
 function updateBlockerUI() {
-    console.log('POPUP.JS: Updating website blocker UI', {
+    console.log('POPUP.JS: 🔧 Updating website blocker UI v3.0 - Enhanced Debugging', {
         enabled: isBlockingEnabled,
         blockedSites: blockedWebsites.length,
-        sites: blockedWebsites
+        sites: blockedWebsites,
+        timestamp: Date.now()
     });
     
-    // Get elements with null checks
-    const toggle = document.getElementById('blockerToggle');
-    const status = document.getElementById('blockerStatus');
-    const blockedCount = document.getElementById('blockedCount');
-    const bar = document.getElementById('blockerBar');
+    // ENHANCED ELEMENT FINDING: Multiple strategies for finding elements
+    const elements = {
+        toggle: document.getElementById('blockerToggle'),
+        status: document.getElementById('blockerStatus'),
+        blockedCount: null, // Will be set below with enhanced finding
+        bar: document.getElementById('blockerBar')
+    };
     
-    // Check if elements exist before updating with retry mechanism (max 5 retries)
-    if (!toggle || !status || !blockedCount || !bar) {
-        console.warn('POPUP.JS: Blocker UI elements not ready yet v2.1:', {
-            toggle: !!toggle,
-            status: !!status,
-            blockedCount: !!blockedCount,
-            bar: !!bar
+    // ENHANCED BLOCKED COUNT FINDING: Multiple strategies with detailed logging
+    console.log('POPUP.JS: 🔍 Enhanced blockedCount element finding...');
+    
+    // Strategy 1: Standard getElementById
+    elements.blockedCount = document.getElementById('blockedCount');
+    console.log('POPUP.JS: 📍 Strategy 1 (getElementById):', !!elements.blockedCount);
+    
+    // Strategy 2: querySelector with ID
+    if (!elements.blockedCount) {
+        elements.blockedCount = document.querySelector('#blockedCount');
+        console.log('POPUP.JS: 📍 Strategy 2 (querySelector #id):', !!elements.blockedCount);
+    }
+    
+    // Strategy 3: querySelector with class
+    if (!elements.blockedCount) {
+        elements.blockedCount = document.querySelector('.blocked-count');
+        console.log('POPUP.JS: 📍 Strategy 3 (querySelector .class):', !!elements.blockedCount);
+    }
+    
+    // Strategy 4: Find within blocker section
+    if (!elements.blockedCount) {
+        const blockerSection = document.querySelector('.blocker-section');
+        if (blockerSection) {
+            elements.blockedCount = blockerSection.querySelector('.blocked-count') || 
+                                  blockerSection.querySelector('#blockedCount');
+            console.log('POPUP.JS: 📍 Strategy 4 (within blocker section):', !!elements.blockedCount);
+        }
+    }
+    
+    // Strategy 5: Find by text content pattern
+    if (!elements.blockedCount) {
+        const spans = document.querySelectorAll('span');
+        for (const span of spans) {
+            if (span.textContent.match(/^\d+$/) && span.closest('.blocked-sites-preview')) {
+                elements.blockedCount = span;
+                console.log('POPUP.JS: 📍 Strategy 5 (by text pattern):', !!elements.blockedCount);
+                break;
+            }
+        }
+    }
+    
+    // COMPREHENSIVE ELEMENT ANALYSIS
+    console.log('POPUP.JS: 🔍 Comprehensive element analysis:', {
+        toggle: !!elements.toggle,
+        status: !!elements.status,
+        blockedCount: !!elements.blockedCount,
+        bar: !!elements.bar,
+        blockedCountElement: elements.blockedCount ? {
+            id: elements.blockedCount.id,
+            className: elements.blockedCount.className,
+            tagName: elements.blockedCount.tagName,
+            textContent: elements.blockedCount.textContent,
+            parentElement: elements.blockedCount.parentElement?.className
+        } : null
+    });
+    
+    // DOM STRUCTURE ANALYSIS for debugging
+    const domAnalysis = {
+        readyState: document.readyState,
+        bodyExists: !!document.body,
+        totalElements: document.querySelectorAll('*').length,
+        blockerSection: !!document.querySelector('.blocker-section'),
+        blockedSitesPreview: !!document.querySelector('.blocked-sites-preview'),
+        allSpansWithClasses: Array.from(document.querySelectorAll('span[class]')).map(s => ({
+            id: s.id,
+            className: s.className,
+            text: s.textContent.trim()
+        })),
+        allElementsWithBlockedInName: Array.from(document.querySelectorAll('[id*="blocked"], [class*="blocked"]')).map(el => ({
+            id: el.id,
+            className: el.className,
+            tagName: el.tagName,
+            text: el.textContent.trim()
+        }))
+    };
+    console.log('POPUP.JS: 🔍 DOM structure analysis:', domAnalysis);
+    
+    // CHECK CRITICAL ELEMENTS with detailed error reporting
+    const missingElements = [];
+    if (!elements.toggle) missingElements.push('toggle');
+    if (!elements.status) missingElements.push('status');
+    if (!elements.blockedCount) missingElements.push('blockedCount');
+    if (!elements.bar) missingElements.push('bar');
+    
+    if (missingElements.length > 0) {
+        console.error('POPUP.JS: ❌ Missing critical elements:', missingElements);
+        console.error('POPUP.JS: 🔍 Element search details:', {
+            toggle: { found: !!elements.toggle, selector: '#blockerToggle' },
+            status: { found: !!elements.status, selector: '#blockerStatus' },
+            blockedCount: { found: !!elements.blockedCount, selector: '#blockedCount' },
+            bar: { found: !!elements.bar, selector: '#blockerBar' }
         });
         
-        // Enhanced debugging for missing elements
-        if (!blockedCount) {
-            const altBlockedCount = document.querySelector('.blocked-count');
-            const allBlockedCounts = document.querySelectorAll('[id*="blocked"], [class*="blocked"], [class*="count"]');
-            console.error('POPUP.JS: blockedCount debugging:', {
-                byId: !!document.getElementById('blockedCount'),
-                byClass: !!altBlockedCount,
-                altElement: altBlockedCount,
-                similarElements: allBlockedCounts.length,
-                allIds: Array.from(document.querySelectorAll('[id]')).map(el => el.id)
-            });
-        }
-        
-        // Retry up to 5 times with exponential backoff
+        // Enhanced retry mechanism with detailed logging
         if (!updateBlockerUI.retryCount) updateBlockerUI.retryCount = 0;
         if (updateBlockerUI.retryCount < 5) {
             updateBlockerUI.retryCount++;
             const delay = Math.min(100 * Math.pow(2, updateBlockerUI.retryCount - 1), 500);
-            console.log(`POPUP.JS: Retrying updateBlockerUI in ${delay}ms (attempt ${updateBlockerUI.retryCount}/5) v2.1`);
+            console.warn(`POPUP.JS: ⏳ Retrying updateBlockerUI in ${delay}ms (attempt ${updateBlockerUI.retryCount}/5) v3.0`);
+            console.log('POPUP.JS: 🔄 Current DOM state while retrying:', {
+                documentReady: document.readyState,
+                bodyChildren: document.body?.children.length,
+                containerExists: !!document.querySelector('.container'),
+                timestamp: Date.now()
+            });
             setTimeout(() => updateBlockerUI(), delay);
         } else {
-            console.error('POPUP.JS: Failed to find blocker UI elements after 5 retries v2.1');
-            console.error('POPUP.JS: Final DOM state:', {
-                readyState: document.readyState,
-                bodyExists: !!document.body,
-                elementCount: document.querySelectorAll('*').length,
-                containerExists: !!document.querySelector('.container'),
-                blockerSectionExists: !!document.querySelector('.blocker-section'),
-                allIdsInDocument: Array.from(document.querySelectorAll('[id]')).map(el => el.id)
-            });
+            console.error('POPUP.JS: ❌ FAILED to find blocker UI elements after 5 retries v3.0');
+            console.error('POPUP.JS: 🔍 Final attempt - trying graceful degradation...');
             
-            // Try to continue with available elements (graceful degradation)
-            console.warn('POPUP.JS: Attempting graceful degradation with available elements...');
+            // GRACEFUL DEGRADATION: Try to work with whatever we can find
+            console.log('POPUP.JS: 🔧 Attempting to work with available elements only...');
         }
-        return;
+        
+        // Even with missing elements, try to update what we can
+        if (missingElements.length < 4) {
+            console.log('POPUP.JS: 🔧 Partial update with available elements...');
+        } else {
+            return; // Too many missing elements, abort
+        }
     }
     
     // Reset retry counter on success
     updateBlockerUI.retryCount = 0;
     
-    console.log('POPUP.JS: Updating blocker UI elements - enabled:', isBlockingEnabled);
+    console.log('POPUP.JS: ✅ All elements found, proceeding with UI updates v3.0');
     
-    if (isBlockingEnabled) {
-        toggle.classList.add('active');
-        bar.classList.add('active');
-        status.textContent = 'Active';
-        status.classList.remove('inactive');
-    } else {
-        toggle.classList.remove('active');
-        bar.classList.remove('active');
-        status.textContent = 'Inactive';
-        status.classList.add('inactive');
-    }
+    // INSTANT UI UPDATES: Apply all changes immediately
+    console.log('POPUP.JS: 🎨 Applying instant UI updates - enabled:', isBlockingEnabled);
     
-    // Update blocked count with fallback
-    if (blockedCount) {
-        blockedCount.textContent = blockedWebsites.length;
-        console.log('POPUP.JS: Updated blocked count to:', blockedWebsites.length);
-    } else {
-        // Fallback: try to find by class selector
-        const altBlockedCount = document.querySelector('.blocked-count');
-        if (altBlockedCount) {
-            altBlockedCount.textContent = blockedWebsites.length;
-            console.log('POPUP.JS: Updated blocked count via fallback selector to:', blockedWebsites.length);
+    // Update toggle state with enhanced visual feedback
+    if (elements.toggle) {
+        console.log('POPUP.JS: 🔄 Updating toggle state:', isBlockingEnabled ? 'ON' : 'OFF');
+        if (isBlockingEnabled) {
+            elements.toggle.classList.add('active');
+            elements.toggle.setAttribute('data-state', 'active');
         } else {
-            console.warn('POPUP.JS: Could not update blocked count - element not found');
+            elements.toggle.classList.remove('active');
+            elements.toggle.setAttribute('data-state', 'inactive');
         }
     }
     
-    // Update sites grid
-    updateSitesGrid();
+    // Update status with enhanced feedback
+    if (elements.status) {
+        console.log('POPUP.JS: 🔄 Updating status text:', isBlockingEnabled ? 'Active' : 'Inactive');
+        if (isBlockingEnabled) {
+            elements.status.textContent = 'Active';
+            elements.status.classList.remove('inactive');
+            elements.status.classList.add('active');
+        } else {
+            elements.status.textContent = 'Inactive';
+            elements.status.classList.remove('active');
+            elements.status.classList.add('inactive');
+        }
+    }
+    
+    // Update bar state with enhanced feedback
+    if (elements.bar) {
+        console.log('POPUP.JS: 🔄 Updating bar state:', isBlockingEnabled ? 'active' : 'inactive');
+        if (isBlockingEnabled) {
+            elements.bar.classList.add('active');
+            elements.bar.setAttribute('data-state', 'active');
+        } else {
+            elements.bar.classList.remove('active');
+            elements.bar.setAttribute('data-state', 'inactive');
+        }
+    }
+    
+    // Update blocked count with MULTIPLE STRATEGIES
+    console.log('POPUP.JS: 🔄 Updating blocked count to:', blockedWebsites.length);
+    let blockedCountUpdated = false;
+    
+    if (elements.blockedCount) {
+        elements.blockedCount.textContent = blockedWebsites.length;
+        elements.blockedCount.setAttribute('data-count', blockedWebsites.length);
+        console.log('POPUP.JS: ✅ Primary blocked count updated successfully');
+        blockedCountUpdated = true;
+    }
+    
+    // FALLBACK STRATEGIES for blocked count
+    if (!blockedCountUpdated) {
+        console.log('POPUP.JS: 🔄 Attempting fallback strategies for blocked count...');
+        
+        // Fallback 1: All elements with 'blocked-count' class
+        const altElements = document.querySelectorAll('.blocked-count');
+        altElements.forEach((elem, index) => {
+            elem.textContent = blockedWebsites.length;
+            elem.setAttribute('data-count', blockedWebsites.length);
+            console.log(`POPUP.JS: ✅ Fallback blocked count ${index + 1} updated`);
+            blockedCountUpdated = true;
+        });
+        
+        // Fallback 2: Find in blocked sites preview
+        if (!blockedCountUpdated) {
+            const preview = document.querySelector('.blocked-sites-preview');
+            if (preview) {
+                const countSpan = preview.querySelector('span:last-child');
+                if (countSpan) {
+                    countSpan.textContent = blockedWebsites.length;
+                    countSpan.setAttribute('data-count', blockedWebsites.length);
+                    console.log('POPUP.JS: ✅ Fallback blocked count via preview updated');
+                    blockedCountUpdated = true;
+                }
+            }
+        }
+    }
+    
+    if (!blockedCountUpdated) {
+        console.error('POPUP.JS: ❌ Could not update blocked count with any strategy');
+    }
+    
+    // INSTANT VISUAL FEEDBACK: Update sites grid with enhanced feedback
+    console.log('POPUP.JS: 🎨 Updating sites grid with instant visual feedback...');
+    updateSitesGridWithInstantFeedback();
+    
+    // Update additional UI components
     updateCustomSitesList();
     updateBlockedSitesPreview();
     
-    console.log('POPUP.JS: Blocker UI update complete');
+    console.log('POPUP.JS: ✅ Blocker UI update complete v3.0 - All systems updated');
 }
 
-function updateSitesGrid() {
+// ENHANCED SITES GRID UPDATE with instant visual feedback
+function updateSitesGridWithInstantFeedback() {
+    console.log('POPUP.JS: 🎨 Updating sites grid with enhanced visual feedback...');
+    
     const sitesGrid = document.getElementById('sitesGrid');
     if (!sitesGrid) {
-        console.warn('POPUP.JS: Sites grid element not ready');
+        console.warn('POPUP.JS: ⚠️ Sites grid element not found');
         return;
     }
+    
+    // Clear existing content
     sitesGrid.innerHTML = '';
     
-    popularSites.forEach(site => {
+    // Add each site with enhanced visual feedback
+    popularSites.forEach((site, index) => {
         const siteItem = document.createElement('div');
         siteItem.className = 'site-item';
         const isBlocked = blockedWebsites.includes(site.url);
         
+        console.log(`POPUP.JS: 🔄 Adding site ${index + 1}: ${site.name} (${isBlocked ? 'BLOCKED' : 'ALLOWED'})`);
+        
+        // ENHANCED VISUAL FEEDBACK: Add blocked state with animation
         if (isBlocked) {
             siteItem.classList.add('blocked');
+            siteItem.setAttribute('data-blocked', 'true');
+            console.log(`POPUP.JS: 🚫 Site ${site.name} marked as BLOCKED with visual feedback`);
+        } else {
+            siteItem.setAttribute('data-blocked', 'false');
+            console.log(`POPUP.JS: ✅ Site ${site.name} marked as ALLOWED`);
         }
         
         siteItem.innerHTML = `
@@ -798,116 +951,88 @@ function updateSitesGrid() {
             <span class="site-name">${site.name}</span>
         `;
         
-        // Add error handler programmatically to avoid CSP issues
+        // Enhanced error handling for images
         const img = siteItem.querySelector('img');
         img.addEventListener('error', function() {
+            console.warn(`POPUP.JS: ⚠️ Failed to load icon for ${site.name}`);
             this.style.display = 'none';
         });
         
-        siteItem.addEventListener('click', () => toggleSiteBlocking(site.url));
-        sitesGrid.appendChild(siteItem);
-    });
-}
-
-function updateCustomSitesList() {
-    const customSitesList = document.getElementById('customSitesList');
-    if (!customSitesList) {
-        console.warn('POPUP.JS: Custom sites list element not ready');
-        return;
-    }
-    customSitesList.innerHTML = '';
-    
-    const customSites = blockedWebsites.filter(site => 
-        !popularSites.some(popular => popular.url === site)
-    );
-    
-    customSites.forEach(site => {
-        const siteItem = document.createElement('div');
-        siteItem.className = 'custom-site-item';
-        siteItem.innerHTML = `
-            <span class="custom-site-url">${site}</span>
-            <button class="remove-btn" data-site="${site}">×</button>
-        `;
-        
-        siteItem.querySelector('.remove-btn').addEventListener('click', (e) => {
-            e.stopPropagation();
-            removeCustomSite(site);
+        img.addEventListener('load', function() {
+            console.log(`POPUP.JS: ✅ Successfully loaded icon for ${site.name}`);
         });
         
-        customSitesList.appendChild(siteItem);
-    });
-}
-
-function updateBlockedSitesPreview() {
-    const preview = document.querySelector('.blocked-sites-preview');
-    if (!preview) {
-        console.warn('POPUP.JS: Blocked sites preview element not ready');
-        return;
-    }
-    preview.innerHTML = '';
-    
-    const blockedCount = blockedWebsites.length;
-    
-    if (blockedCount === 0) {
-        preview.innerHTML = '<span class="site-icon placeholder">🌐</span><span class="blocked-count">0</span>';
-        return;
-    }
-    
-    // Show up to 3 site icons
-    const sitesToShow = Math.min(3, blockedCount);
-    let iconsShown = 0;
-    
-    for (const site of blockedWebsites) {
-        if (iconsShown >= sitesToShow) break;
+        // ENHANCED CLICK HANDLER with immediate feedback
+        siteItem.addEventListener('click', () => {
+            console.log(`POPUP.JS: 🖱️ User clicked on ${site.name} (currently ${isBlocked ? 'BLOCKED' : 'ALLOWED'})`);
+            
+            // INSTANT VISUAL FEEDBACK: Update appearance immediately
+            const willBeBlocked = !isBlocked;
+            console.log(`POPUP.JS: 🎨 Applying instant visual feedback: ${site.name} will be ${willBeBlocked ? 'BLOCKED' : 'ALLOWED'}`);
+            
+            if (willBeBlocked) {
+                siteItem.classList.add('blocked');
+                siteItem.setAttribute('data-blocked', 'true');
+                console.log(`POPUP.JS: 🚫 Instantly applied BLOCKED visual state to ${site.name}`);
+            } else {
+                siteItem.classList.remove('blocked');
+                siteItem.setAttribute('data-blocked', 'false');
+                console.log(`POPUP.JS: ✅ Instantly applied ALLOWED visual state to ${site.name}`);
+            }
+            
+            // ENHANCED CLICK ANIMATION
+            siteItem.style.transform = 'scale(0.95)';
+            setTimeout(() => {
+                siteItem.style.transform = 'scale(1)';
+            }, 150);
+            
+            // Now call the actual toggle function
+            toggleSiteBlocking(site.url);
+        });
         
-        const popularSite = popularSites.find(p => p.url === site);
-        if (popularSite) {
-            const icon = document.createElement('img');
-            icon.src = popularSite.icon;
-            icon.alt = popularSite.name;
-            icon.className = 'site-icon';
-            icon.title = popularSite.name;
-            icon.addEventListener('error', function() { this.style.display = 'none'; });
-            preview.appendChild(icon);
-            iconsShown++;
-        }
-    }
+        sitesGrid.appendChild(siteItem);
+    });
     
-    // Add count
-    const countElement = document.createElement('span');
-    countElement.className = 'blocked-count';
-    countElement.textContent = blockedCount;
-    preview.appendChild(countElement);
+    console.log('POPUP.JS: ✅ Sites grid updated with enhanced visual feedback');
 }
 
-function toggleDropdown() {
-    const dropdown = document.getElementById('blockerDropdown');
-    const bar = document.getElementById('blockerBar');
-    const arrow = document.getElementById('blockerDropdownArrow');
-    
-    if (dropdown.classList.contains('visible')) {
-        dropdown.classList.remove('visible');
-        bar.classList.remove('expanded');
-        arrow.style.transform = 'rotate(0deg)';
-    } else {
-        dropdown.classList.add('visible');
-        bar.classList.add('expanded');
-        arrow.style.transform = 'rotate(180deg)';
-    }
-}
-
+// ENHANCED TOGGLE FUNCTIONS with instant UI feedback
 function toggleWebsiteBlocker() {
-    console.log('POPUP.JS: Toggling website blocker. Current state:', isBlockingEnabled);
+    console.log('POPUP.JS: 🎛️ ENHANCED Website Blocker Toggle v3.0');
+    console.log('POPUP.JS: 📊 Current state before toggle:', {
+        isBlockingEnabled: isBlockingEnabled,
+        blockedWebsites: blockedWebsites.length,
+        timestamp: Date.now()
+    });
     
     const newEnabled = !isBlockingEnabled;
-    console.log('POPUP.JS: Setting website blocker to:', newEnabled);
+    console.log('POPUP.JS: 🔄 Toggling website blocker:', {
+        from: isBlockingEnabled,
+        to: newEnabled,
+        action: newEnabled ? 'ENABLING' : 'DISABLING'
+    });
     
-    // INSTANT UI FEEDBACK: Update UI immediately before background operation
+    // INSTANT UI FEEDBACK: Update local state immediately
     isBlockingEnabled = newEnabled;
-    updateBlockerUI(); // Update UI instantly
-    console.log('POPUP.JS: Applied instant UI feedback for blocker toggle');
+    console.log('POPUP.JS: ⚡ Applied instant state change - blocker now:', isBlockingEnabled ? 'ENABLED' : 'DISABLED');
     
-    // Save to storage
+    // INSTANT VISUAL FEEDBACK: Update UI immediately
+    console.log('POPUP.JS: 🎨 Applying instant visual feedback...');
+    updateBlockerUI();
+    
+    // ENHANCED BUTTON FEEDBACK
+    const toggleButton = document.getElementById('blockerToggle');
+    if (toggleButton) {
+        toggleButton.style.transform = 'scale(0.95)';
+        setTimeout(() => {
+            toggleButton.style.transform = 'scale(1)';
+        }, 150);
+        console.log('POPUP.JS: 🎨 Applied button press animation');
+    }
+    
+    console.log('POPUP.JS: ✅ Instant UI feedback complete - now saving to storage...');
+    
+    // Background operation: Save to storage
     chrome.storage.local.set({ 
         websiteBlockerSettings: { 
             isEnabled: newEnabled,
@@ -915,13 +1040,14 @@ function toggleWebsiteBlocker() {
         }
     }, function() {
         if (chrome.runtime.lastError) {
-            console.error('POPUP.JS: Error saving website blocker state:', chrome.runtime.lastError);
-            // Revert UI on error
+            console.error('POPUP.JS: ❌ Error saving website blocker state:', chrome.runtime.lastError);
+            
+            // REVERT UI on error
+            console.log('POPUP.JS: 🔄 Reverting UI due to storage error...');
             isBlockingEnabled = !newEnabled;
             updateBlockerUI();
         } else {
-            console.log('POPUP.JS: Successfully saved website blocker state');
-            updateBlockerUI();
+            console.log('POPUP.JS: ✅ Successfully saved website blocker state to storage');
             
             // Notify background script
             chrome.runtime.sendMessage({ 
@@ -930,32 +1056,91 @@ function toggleWebsiteBlocker() {
                 blockedWebsites: blockedWebsites
             }, function(response) {
                 if (chrome.runtime.lastError) {
-                    console.error('POPUP.JS: Error notifying background script:', chrome.runtime.lastError);
+                    console.error('POPUP.JS: ❌ Error notifying background script:', chrome.runtime.lastError);
                 } else {
-                    console.log('POPUP.JS: Background blocker state updated:', response);
+                    console.log('POPUP.JS: ✅ Background script notified successfully:', response);
                 }
             });
         }
     });
+    
+    console.log('POPUP.JS: 🎛️ Website blocker toggle complete v3.0');
 }
 
 function toggleSiteBlocking(siteUrl) {
-    console.log('POPUP.JS: Toggling blocking for site:', siteUrl);
+    console.log('POPUP.JS: 🎛️ ENHANCED Site Blocking Toggle v3.0');
+    console.log('POPUP.JS: 📊 Toggling site blocking for:', {
+        url: siteUrl,
+        currentlyBlocked: blockedWebsites.includes(siteUrl),
+        totalBlockedSites: blockedWebsites.length,
+        timestamp: Date.now()
+    });
     
     const index = blockedWebsites.indexOf(siteUrl);
-    if (index > -1) {
+    const wasBlocked = index > -1;
+    const willBeBlocked = !wasBlocked;
+    
+    console.log('POPUP.JS: 🔄 Site blocking change:', {
+        site: siteUrl,
+        action: willBeBlocked ? 'BLOCKING' : 'UNBLOCKING',
+        wasBlocked: wasBlocked,
+        willBeBlocked: willBeBlocked
+    });
+    
+    // INSTANT STATE CHANGE: Update blocked websites array immediately
+    if (wasBlocked) {
         blockedWebsites.splice(index, 1);
-        console.log('POPUP.JS: Removed site from blocked list');
+        console.log('POPUP.JS: ⚡ Instantly removed site from blocked list');
     } else {
         blockedWebsites.push(siteUrl);
-        console.log('POPUP.JS: Added site to blocked list');
+        console.log('POPUP.JS: ⚡ Instantly added site to blocked list');
     }
     
-    // Immediate UI feedback
+    console.log('POPUP.JS: 📊 Updated blocked websites:', {
+        totalCount: blockedWebsites.length,
+        sites: blockedWebsites,
+        lastAction: willBeBlocked ? 'BLOCKED' : 'UNBLOCKED',
+        targetSite: siteUrl
+    });
+    
+    // INSTANT VISUAL FEEDBACK: Update UI immediately
+    console.log('POPUP.JS: 🎨 Applying instant visual feedback for site toggle...');
     updateBlockerUI();
     
-    // Save to storage
+    // ENHANCED VISUAL FEEDBACK: Find and animate the specific site element
+    const siteElements = document.querySelectorAll('.site-item');
+    for (const siteElement of siteElements) {
+        const siteName = siteElement.querySelector('.site-name');
+        if (siteName && siteName.textContent.toLowerCase().includes(siteUrl.split('.')[0])) {
+            console.log(`POPUP.JS: 🎨 Found site element for ${siteUrl}, applying animation...`);
+            
+            // Apply instant visual state
+            if (willBeBlocked) {
+                siteElement.classList.add('blocked');
+                siteElement.setAttribute('data-blocked', 'true');
+                console.log(`POPUP.JS: 🚫 Applied BLOCKED visual state to ${siteUrl}`);
+            } else {
+                siteElement.classList.remove('blocked');
+                siteElement.setAttribute('data-blocked', 'false');
+                console.log(`POPUP.JS: ✅ Applied ALLOWED visual state to ${siteUrl}`);
+            }
+            
+            // Feedback animation
+            siteElement.style.transform = 'scale(0.95)';
+            setTimeout(() => {
+                siteElement.style.transform = 'scale(1)';
+            }, 150);
+            
+            break;
+        }
+    }
+    
+    console.log('POPUP.JS: ✅ Instant visual feedback complete - now saving to storage...');
+    
+    // Background operation: Save to storage
     saveBlockerSettings();
+    
+    console.log('POPUP.JS: 🎛️ Site blocking toggle complete v3.0');
 }
 
 function addCustomSite() {
@@ -1076,6 +1261,161 @@ function testWebsiteBlocking(url) {
             console.log('POPUP.JS: Website blocking test result:', response);
         }
     });
+}
+
+// ENHANCED SITES GRID UPDATE (wrapper function)
+function updateSitesGrid() {
+    // Use the enhanced version for all updates
+    updateSitesGridWithInstantFeedback();
+}
+
+// ENHANCED CUSTOM SITES LIST UPDATE with instant feedback
+function updateCustomSitesList() {
+    console.log('POPUP.JS: 🔄 Updating custom sites list...');
+    
+    const customSitesList = document.getElementById('customSitesList');
+    if (!customSitesList) {
+        console.warn('POPUP.JS: ⚠️ Custom sites list element not found');
+        return;
+    }
+    customSitesList.innerHTML = '';
+    
+    const customSites = blockedWebsites.filter(site => 
+        !popularSites.some(popular => popular.url === site)
+    );
+    
+    console.log('POPUP.JS: 📊 Found custom sites:', customSites.length);
+    
+    customSites.forEach((site, index) => {
+        console.log(`POPUP.JS: 🔄 Adding custom site ${index + 1}: ${site}`);
+        
+        const siteItem = document.createElement('div');
+        siteItem.className = 'custom-site-item';
+        siteItem.innerHTML = `
+            <span class="custom-site-url">${site}</span>
+            <button class="remove-btn" data-site="${site}">×</button>
+        `;
+        
+        siteItem.querySelector('.remove-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            console.log(`POPUP.JS: 🗑️ User clicked remove for custom site: ${site}`);
+            
+            // INSTANT VISUAL FEEDBACK: Animate removal
+            siteItem.style.transform = 'scale(0.95)';
+            setTimeout(() => {
+                siteItem.style.opacity = '0.5';
+                setTimeout(() => {
+                    removeCustomSite(site);
+                }, 100);
+            }, 150);
+        });
+        
+        customSitesList.appendChild(siteItem);
+    });
+    
+    console.log('POPUP.JS: ✅ Custom sites list updated');
+}
+
+// ENHANCED BLOCKED SITES PREVIEW UPDATE with instant feedback
+function updateBlockedSitesPreview() {
+    console.log('POPUP.JS: 🔄 Updating blocked sites preview...');
+    
+    const preview = document.querySelector('.blocked-sites-preview');
+    if (!preview) {
+        console.warn('POPUP.JS: ⚠️ Blocked sites preview element not found');
+        return;
+    }
+    
+    // Clear existing content
+    preview.innerHTML = '';
+    
+    const blockedCount = blockedWebsites.length;
+    console.log('POPUP.JS: 📊 Total blocked sites for preview:', blockedCount);
+    
+    if (blockedCount === 0) {
+        preview.innerHTML = '<span class="site-icon placeholder">🌐</span><span class="blocked-count" id="blockedCount">0</span>';
+        console.log('POPUP.JS: 🔄 Set preview to empty state');
+        return;
+    }
+    
+    // Show up to 3 site icons
+    const sitesToShow = Math.min(3, blockedCount);
+    let iconsShown = 0;
+    
+    console.log('POPUP.JS: 🔄 Adding site icons to preview...');
+    
+    for (const site of blockedWebsites) {
+        if (iconsShown >= sitesToShow) break;
+        
+        const popularSite = popularSites.find(p => p.url === site);
+        if (popularSite) {
+            const icon = document.createElement('img');
+            icon.src = popularSite.icon;
+            icon.alt = popularSite.name;
+            icon.className = 'site-icon';
+            icon.title = popularSite.name;
+            icon.addEventListener('error', function() { 
+                console.warn(`POPUP.JS: ⚠️ Failed to load preview icon for ${popularSite.name}`);
+                this.style.display = 'none'; 
+            });
+            icon.addEventListener('load', function() {
+                console.log(`POPUP.JS: ✅ Successfully loaded preview icon for ${popularSite.name}`);
+            });
+            preview.appendChild(icon);
+            iconsShown++;
+            console.log(`POPUP.JS: 🔄 Added icon ${iconsShown} for ${popularSite.name}`);
+        }
+    }
+    
+    // Add count element with proper ID
+    const countElement = document.createElement('span');
+    countElement.className = 'blocked-count';
+    countElement.id = 'blockedCount';
+    countElement.textContent = blockedCount;
+    countElement.setAttribute('data-count', blockedCount);
+    preview.appendChild(countElement);
+    
+    console.log('POPUP.JS: 🔄 Added count element with value:', blockedCount);
+    console.log('POPUP.JS: ✅ Blocked sites preview updated');
+}
+
+// ENHANCED DROPDOWN TOGGLE with instant feedback
+function toggleDropdown() {
+    console.log('POPUP.JS: 🔄 Toggling dropdown menu...');
+    
+    const dropdown = document.getElementById('blockerDropdown');
+    const bar = document.getElementById('blockerBar');
+    const arrow = document.getElementById('blockerDropdownArrow');
+    
+    if (!dropdown || !bar || !arrow) {
+        console.warn('POPUP.JS: ⚠️ Dropdown elements not found');
+        return;
+    }
+    
+    const isCurrentlyVisible = dropdown.classList.contains('visible');
+    console.log('POPUP.JS: 📊 Dropdown currently visible:', isCurrentlyVisible);
+    
+    if (isCurrentlyVisible) {
+        // Closing dropdown
+        dropdown.classList.remove('visible');
+        bar.classList.remove('expanded');
+        arrow.style.transform = 'rotate(0deg)';
+        console.log('POPUP.JS: 🔄 Dropdown closed');
+    } else {
+        // Opening dropdown
+        dropdown.classList.add('visible');
+        bar.classList.add('expanded');
+        arrow.style.transform = 'rotate(180deg)';
+        console.log('POPUP.JS: 🔄 Dropdown opened');
+    }
+    
+    // Add click animation
+    arrow.style.transform += ' scale(0.9)';
+    setTimeout(() => {
+        arrow.style.transform = arrow.style.transform.replace(' scale(0.9)', '');
+    }, 150);
+    
+    console.log('POPUP.JS: ✅ Dropdown toggle complete');
 }
 
 // Add to global scope for manual testing
