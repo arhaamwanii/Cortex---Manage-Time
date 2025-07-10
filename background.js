@@ -1,467 +1,5 @@
-// Elevate Background Service Worker - Enhanced with Website Blocking
-console.log('BACKGROUND: Service worker started');
-
-// Timer state management
-let timerState = {
-    enabled: false,
-    timeLeft: 25 * 60,
-    defaultTime: 25 * 60,
-    isRunning: false,
-    mode: 'pomodoro',
-    currentTask: '',
-    totalSessionTime: 0,
-    startTime: null,
-    stopwatch: {
-        totalTime: 0,
-        sessionTime: 0,
-        startTime: null
-    },
-    reminderFrequency: 0,
-    customReminderSound: null,
-    reminderIntervalId: null
-};
-
-// Website Blocker state - integrated with timer
-let websiteBlockerState = {
-  isEnabled: false,
-  blockedWebsites: [
-    'youtube.com',
-    'tiktok.com', 
-    'instagram.com',
-    'x.com',
-    'twitter.com',
-    'facebook.com',
-    'reddit.com'
-  ],
-  blockedToday: 0,
-  granularBlocks: {
-    youtubeRecommendations: false,
-    twitterTimeline: false,
-    instagramReels: false
-  },
-  customBlockImage: null
-};
-
-// Global timer interval
-let globalTimerInterval = null;
-
-// Startup initialization
-chrome.runtime.onStartup.addListener(() => {
-    console.log('BACKGROUND: Extension startup detected');
-    initializeExtension();
-});
-
-chrome.runtime.onInstalled.addListener((details) => {
-    console.log('BACKGROUND: Extension installed/updated', details);
-    initializeExtension();
-});
-
-// Initialize both timer and website blocker
-async function initializeExtension() {
-    console.log('BACKGROUND: Initializing extension...');
-    await loadTimerState();
-    await loadWebsiteBlockerState();
-    setupWebsiteBlockingListeners();
-    console.log('BACKGROUND: Extension initialized successfully');
-}
-
-// Load website blocker state from storage
-async function loadWebsiteBlockerState() {
-  try {
-    const result = await chrome.storage.local.get(['websiteBlockerSettings']);
-    if (result.websiteBlockerSettings) {
-      websiteBlockerState = { ...websiteBlockerState, ...result.websiteBlockerSettings };
-      console.log('BACKGROUND: Website blocker state loaded from storage');
-    } else {
-      // First time setup - save default state
-      await saveWebsiteBlockerState();
-      console.log('BACKGROUND: Website blocker initialized with default settings');
-    }
-  } catch (error) {
-    console.error('BACKGROUND: Error loading website blocker state:', error);
-  }
-}
-
-// Save website blocker state to storage
-async function saveWebsiteBlockerState() {
-  try {
-    await chrome.storage.local.set({ websiteBlockerSettings: websiteBlockerState });
-    console.log('BACKGROUND: Website blocker state saved');
-  } catch (error) {
-    console.error('BACKGROUND: Error saving website blocker state:', error);
-  }
-}
-
-// Check if URL should be blocked
-function shouldBlockWebsite(url) {
-  if (!websiteBlockerState.isEnabled || !url) {
-    return false;
-  }
-  
-  try {
-    const urlObj = new URL(url);
-    const hostname = urlObj.hostname.toLowerCase().replace(/^www\./, '');
-    
-    const shouldBlock = websiteBlockerState.blockedWebsites.some(blocked => {
-      const cleanBlocked = blocked.toLowerCase().replace(/^www\./, '');
-      return hostname === cleanBlocked || 
-             hostname.endsWith('.' + cleanBlocked) ||
-             cleanBlocked.endsWith('.' + hostname) ||
-             hostname.includes(cleanBlocked) ||
-             cleanBlocked.includes(hostname);
-    });
-    
-    console.log(`BACKGROUND: Blocking check for ${hostname}: ${shouldBlock} (isEnabled: ${websiteBlockerState.isEnabled})`);
-    return shouldBlock;
-  } catch (error) {
-    console.error('BACKGROUND: Error checking if URL should be blocked:', error);
-    return false;
-  }
-}
-
-// Block website by redirecting to new tab
-async function blockWebsiteTab(tabId, url) {
-  try {
-    console.log(`BACKGROUND: Blocking website: ${url}`);
-    
-    // Update blocked today count
-    websiteBlockerState.blockedToday = (websiteBlockerState.blockedToday || 0) + 1;
-    await saveWebsiteBlockerState();
-    
-    // Check if new tab redirection is enabled
-    const result = await chrome.storage.sync.get(['newtabEnabled']);
-    const newtabEnabled = result.newtabEnabled !== false; // Default to true
-    
-    if (newtabEnabled) {
-      // Redirect to our new tab page
-      const newTabUrl = chrome.runtime.getURL('newtab.html') + '?blocked=' + encodeURIComponent(url);
-      await chrome.tabs.update(tabId, { url: newTabUrl });
-    } else {
-      // Generate block page content and inject it
-      const blockPageContent = generateWebsiteBlockPage(url);
-      
-      await chrome.scripting.executeScript({
-        target: { tabId: tabId },
-        func: (content) => {
-          document.documentElement.innerHTML = content;
-        },
-        args: [blockPageContent]
-      });
-    }
-    
-    console.log(`BACKGROUND: Website blocked successfully: ${url}`);
-  } catch (error) {
-    console.error('BACKGROUND: Error blocking website:', error);
-  }
-}
-
-// Generate block page content
-function generateWebsiteBlockPage(blockedUrl) {
-  const quotes = [
-    "Focus on your goals, not distractions.",
-    "Every moment you resist distraction, you build willpower.",
-    "Your future self will thank you for staying focused.",
-    "Progress, not perfection.",
-    "Stay focused and never give up.",
-    "Discipline is choosing between what you want now and what you want most.",
-    "Great things never come from comfort zones.",
-    "Success is the sum of small efforts repeated daily."
-  ];
-  
-  const quote = quotes[Math.floor(Math.random() * quotes.length)];
-  
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>Website Blocked - Stay Focused</title>
-      <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          min-height: 100vh;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: white;
-          text-align: center;
-        }
-        .container {
-          background: rgba(0, 0, 0, 0.7);
-          padding: 2rem;
-          border-radius: 1rem;
-          backdrop-filter: blur(10px);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          max-width: 500px;
-        }
-        h1 { font-size: 2rem; margin-bottom: 1rem; }
-        .blocked-url { 
-          background: rgba(255, 255, 255, 0.1);
-          padding: 0.5rem 1rem;
-          border-radius: 0.5rem;
-          font-family: monospace;
-          margin: 1rem 0;
-          word-break: break-all;
-          font-size: 0.9rem;
-        }
-        .quote {
-          font-size: 1.2rem;
-          font-style: italic;
-          margin: 1.5rem 0;
-          line-height: 1.4;
-        }
-        .back-btn {
-          background: #4CAF50;
-          color: white;
-          border: none;
-          padding: 0.75rem 1.5rem;
-          border-radius: 0.5rem;
-          font-size: 1rem;
-          cursor: pointer;
-          margin-top: 1rem;
-          transition: background 0.3s;
-        }
-        .back-btn:hover { background: #45a049; }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <h1>🎯 Website Blocked</h1>
-        <div class="blocked-url">${blockedUrl}</div>
-        <div class="quote">"${quote}"</div>
-        <button class="back-btn" onclick="history.back()">Go Back</button>
-      </div>
-    </body>
-    </html>
-  `;
-}
-
-// Setup website blocking listeners
-function setupWebsiteBlockingListeners() {
-  console.log('BACKGROUND: Setting up website blocking listeners...');
-  
-  // Tab update listener
-  chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-    if (changeInfo.status === 'complete' && tab.url) {
-      console.log(`BACKGROUND: Tab updated: ${tab.url}`);
-      
-      if (shouldBlockWebsite(tab.url)) {
-        await blockWebsiteTab(tabId, tab.url);
-      } else {
-        // Apply granular blocking for allowed sites
-        setTimeout(() => {
-          applyGranularBlocking(tabId, tab.url);
-        }, 1000);
-      }
-    }
-  });
-  
-  // Before navigate listener for faster blocking
-  chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
-    if (details.frameId === 0) {
-      if (shouldBlockWebsite(details.url)) {
-        console.log(`BACKGROUND: Blocking website before load: ${details.url}`);
-        await blockWebsiteTab(details.tabId, details.url);
-      }
-    }
-  });
-  
-  // Storage listener to stay in sync
-  chrome.storage.onChanged.addListener(async (changes, area) => {
-    if (area === 'local' && changes.websiteBlockerSettings) {
-      const newSettings = changes.websiteBlockerSettings.newValue;
-      if (newSettings) {
-        console.log('BACKGROUND: Website blocker settings changed:', newSettings);
-        websiteBlockerState = { ...websiteBlockerState, ...newSettings };
-      }
-    }
-  });
-  
-  console.log('BACKGROUND: Website blocking listeners set up successfully');
-}
-
-// Apply granular blocking for specific platforms
-async function applyGranularBlocking(tabId, url) {
-  if (!websiteBlockerState.isEnabled) return;
-  
-  try {
-    const hostname = new URL(url).hostname.toLowerCase().replace(/^www\./, '');
-    
-    // YouTube granular blocking
-    if (websiteBlockerState.granularBlocks?.youtubeRecommendations === true && 
-        (hostname === 'youtube.com' || hostname.endsWith('.youtube.com'))) {
-      await injectYouTubeBlocking(tabId);
-    }
-    
-    // X/Twitter granular blocking
-    if (websiteBlockerState.granularBlocks?.twitterTimeline === true && 
-        (hostname === 'x.com' || hostname === 'twitter.com' || 
-         hostname.endsWith('.x.com') || hostname.endsWith('.twitter.com'))) {
-      await injectTwitterBlocking(tabId);
-    }
-    
-    // Instagram granular blocking
-    if (websiteBlockerState.granularBlocks?.instagramReels === true && 
-        (hostname === 'instagram.com' || hostname.endsWith('.instagram.com'))) {
-      await injectInstagramBlocking(tabId);
-    }
-  } catch (error) {
-    console.error('BACKGROUND: Error applying granular blocking:', error);
-  }
-}
-
-// Inject YouTube recommendations blocking
-async function injectYouTubeBlocking(tabId) {
-  try {
-    await chrome.scripting.executeScript({
-      target: { tabId: tabId },
-      func: () => {
-        const css = `
-          /* Hide YouTube homepage feed */
-          ytd-browse[page-subtype="home"] #contents ytd-rich-grid-renderer,
-          ytd-browse[page-subtype="home"] #contents ytd-rich-section-renderer,
-          ytd-browse[page-subtype="home"] #primary,
-          ytd-browse[page-subtype="home"] .ytd-rich-grid-renderer,
-          
-          /* Hide recommended videos in sidebar */
-          ytd-watch-next-secondary-results-renderer,
-          #related,
-          #watch-sidebar,
-          .watch-sidebar,
-          
-          /* Hide homepage chips/filters */
-          ytd-browse[page-subtype="home"] ytd-feed-filter-chip-bar-renderer,
-          
-          /* Hide shorts shelf on homepage */
-          ytd-browse[page-subtype="home"] ytd-rich-shelf-renderer[is-shorts],
-          ytd-browse[page-subtype="home"] ytd-reel-shelf-renderer,
-          
-          /* Hide suggestions at video end */
-          .ytp-endscreen-content,
-          .ytp-ce-video,
-          .ytp-ce-channel {
-            display: none !important;
-          }
-        `;
-        
-        let styleElement = document.getElementById('elevate-youtube-css');
-        if (!styleElement) {
-          styleElement = document.createElement('style');
-          styleElement.id = 'elevate-youtube-css';
-          document.head.appendChild(styleElement);
-        }
-        styleElement.textContent = css;
-        console.log('BACKGROUND: YouTube recommendations blocking applied');
-      }
-    });
-  } catch (error) {
-    console.error('BACKGROUND: Error injecting YouTube blocking:', error);
-  }
-}
-
-// Inject Twitter timeline blocking
-async function injectTwitterBlocking(tabId) {
-  try {
-    await chrome.scripting.executeScript({
-      target: { tabId: tabId },
-      func: () => {
-        const css = `
-          /* Hide main timeline feeds */
-          [data-testid="primaryColumn"] [aria-label*="Timeline"],
-          [data-testid="primaryColumn"] section[role="region"],
-          div[data-testid="primaryColumn"] > div > div:nth-child(2),
-          
-          /* Hide For You and Following tabs content */
-          [data-testid="primaryColumn"] [role="tabpanel"],
-          [data-testid="primaryColumn"] article,
-          
-          /* Hide trending and who to follow */
-          [data-testid="sidebarColumn"] [aria-label*="Timeline: Trending"],
-          [data-testid="sidebarColumn"] [aria-label*="Who to follow"],
-          [data-testid="sidebarColumn"] [data-testid="trend"],
-          
-          /* Hide promoted content */
-          [data-testid="placementTracking"],
-          article[data-testid="tweet"]:has([data-testid="promotedIndicator"]) {
-            display: none !important;
-          }
-        `;
-        
-        let styleElement = document.getElementById('elevate-twitter-css');
-        if (!styleElement) {
-          styleElement = document.createElement('style');
-          styleElement.id = 'elevate-twitter-css';
-          document.head.appendChild(styleElement);
-        }
-        styleElement.textContent = css;
-        console.log('BACKGROUND: Twitter timeline blocking applied');
-      }
-    });
-  } catch (error) {
-    console.error('BACKGROUND: Error injecting Twitter blocking:', error);
-  }
-}
-
-// Inject Instagram reels blocking
-async function injectInstagramBlocking(tabId) {
-  try {
-    await chrome.scripting.executeScript({
-      target: { tabId: tabId },
-      func: () => {
-        const css = `
-          /* Hide Reels icon from navigation */
-          a[href="/reels/"],
-          a[href*="/reels"],
-          nav a[role="link"]:has(svg):nth-child(3),
-          
-          /* Hide Reels in main navigation bar */
-          div[role="tablist"] a[href="/reels/"],
-          div[role="tablist"] a[href*="reels"],
-          
-          /* Hide Reels from stories bar */
-          section[role="main"] div[role="button"]:has([aria-label*="Reel"]),
-          
-          /* Alternative selectors for Reels icon */
-          [aria-label*="Reels"],
-          a[aria-label*="Reels"] {
-            display: none !important;
-          }
-        `;
-        
-        let styleElement = document.getElementById('elevate-instagram-css');
-        if (!styleElement) {
-          styleElement = document.createElement('style');
-          styleElement.id = 'elevate-instagram-css';
-          document.head.appendChild(styleElement);
-        }
-        styleElement.textContent = css;
-        console.log('BACKGROUND: Instagram reels blocking applied');
-      }
-    });
-  } catch (error) {
-    console.error('BACKGROUND: Error injecting Instagram blocking:', error);
-  }
-}
-
-// Handle toggle from external sources
-async function handleWebsiteBlockerToggle(enabled, settings = {}) {
-  try {
-    console.log(`BACKGROUND: Website blocker toggle: ${enabled ? 'ON' : 'OFF'}`);
-    
-    websiteBlockerState = { 
-      ...websiteBlockerState, 
-      ...settings,
-      isEnabled: enabled 
-    };
-    
-    await saveWebsiteBlockerState();
-    
-    console.log(`BACKGROUND: Website blocker ${enabled ? 'enabled' : 'disabled'}`);
-  } catch (error) {
-    console.error('BACKGROUND: Error handling website blocker toggle:', error);
-  }
-}
+// Background script for synchronized timer
+console.log('BACKGROUND: Service worker starting/restarting at', new Date().toISOString());
 
 // NEW TAB REDIRECT LOGIC (instead of chrome_url_overrides)
 // Track tabs that are created for navigation (links, redirects) - these should NOT be redirected
@@ -563,6 +101,621 @@ function redirectToTimer(tabId) {
   });
 }
 
+// Handle direct navigation to our newtab page when disabled
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  // Track when navigation tabs start loading real URLs
+  if (navigationTabs.has(tabId) && changeInfo.url) {
+    const url = changeInfo.url;
+    if (url !== 'chrome://newtab/' && 
+        url !== 'about:blank' && 
+        url !== '' && 
+        url !== 'chrome://new-tab-page/' &&
+        !url.includes('newtab.html')) {
+      console.log('BACKGROUND: Navigation tab loading real URL:', url);
+      // Keep it in navigationTabs to prevent any future redirect attempts
+    }
+  }
+  
+  // Only check when the page is loading our newtab.html
+  if (changeInfo.status === 'loading' && tab.url && tab.url.includes('newtab.html')) {
+    chrome.storage.sync.get(['newtabEnabled'], (result) => {
+      const newtabEnabled = result.newtabEnabled !== false; // Default to true
+      
+      if (!newtabEnabled) {
+        console.log('BACKGROUND: Newtab accessed while disabled - redirecting to chrome://newtab/');
+        chrome.tabs.update(tabId, { url: 'chrome://newtab/' }).catch((error) => {
+          console.error('BACKGROUND: Failed to redirect disabled newtab:', error);
+        });
+      }
+    });
+  }
+});
+
+// Clean up navigation tabs when they're closed
+chrome.tabs.onRemoved.addListener((tabId) => {
+  if (navigationTabs.has(tabId)) {
+    console.log('BACKGROUND: Cleaning up closed navigation tab:', tabId);
+    navigationTabs.delete(tabId);
+  }
+});
+
+let globalTimer = {
+  timeLeft: 25 * 60,
+  isRunning: false,
+  defaultTime: 25 * 60,
+  interval: null,
+  enabled: true,
+  timerVisible: true, // Separate state for timer visibility (controlled by X button)
+  currentTask: '',
+  mode: 'pomodoro', // 'pomodoro' or 'stopwatch'
+  reminderFrequency: 2, // in minutes
+  customReminderSound: null
+};
+
+let stopwatch = {
+  time: 0,
+  isRunning: false,
+  interval: null
+};
+
+let taskReminderInterval = null;
+
+// Website blocker state
+let websiteBlockerState = {
+  isEnabled: true, // Start enabled for easier testing
+  blockedWebsites: ['youtube.com', 'facebook.com', 'instagram.com', 'twitter.com', 'tiktok.com', 'reddit.com'],
+  blockedToday: 0,
+  customBlockImage: null
+};
+
+// CRITICAL FIX: Debounced saving to prevent quota issues
+let saveTimeout = null;
+let lastSavedState = null;
+let pendingStateChange = false;
+
+// Keep service worker alive
+chrome.runtime.onStartup.addListener(() => {
+  console.log('BACKGROUND: Extension startup detected');
+});
+
+chrome.runtime.onInstalled.addListener(() => {
+  console.log('BACKGROUND: Extension installed/updated');
+});
+
+// Prevent service worker from going inactive
+setInterval(() => {
+  console.log('BACKGROUND: Service worker keepalive ping');
+}, 20000);
+
+// NEW TAB FUNCTIONALITY: Now handled via background redirect (no chrome_url_overrides permission needed)
+// When a new tab is created, we redirect to our extension page if newtabEnabled=true
+
+// STATE RESET: Initialize timer from storage with forced synchronization
+chrome.storage.sync.get(['timerState', 'timerDuration', 'timerEnabled', 'timerVisible', 'stopwatchState', 'newtabEnabled'], function(result) {
+  console.log('BACKGROUND: Initializing with stored state:', result);
+  
+  if (result.timerDuration) {
+    globalTimer.defaultTime = result.timerDuration * 60;
+  }
+  
+  // CRITICAL FIX: Always set enabled to a boolean value, never null
+  if (result.timerEnabled !== undefined && result.timerEnabled !== null) {
+    globalTimer.enabled = Boolean(result.timerEnabled);
+    console.log('BACKGROUND: Loaded timerEnabled from storage:', globalTimer.enabled);
+  } else {
+    // FORCE RESET: If no stored state, set to enabled and save immediately
+    console.log('BACKGROUND: No timerEnabled found, forcing to true');
+    globalTimer.enabled = true;
+    // CRITICAL: Save state immediately to fix null issue
+    chrome.storage.sync.set({ timerEnabled: true }, function() {
+      console.log('BACKGROUND: Forced timerEnabled to true in storage');
+    });
+  }
+  
+  // Initialize timerVisible state
+  if (result.timerVisible !== undefined && result.timerVisible !== null) {
+    globalTimer.timerVisible = Boolean(result.timerVisible);
+    console.log('BACKGROUND: Loaded timerVisible from storage:', globalTimer.timerVisible);
+  } else {
+    // Default to true (visible)
+    globalTimer.timerVisible = true;
+    chrome.storage.sync.set({ timerVisible: true });
+  }
+  
+  // Initialize newtabEnabled state
+  if (result.newtabEnabled === undefined || result.newtabEnabled === null) {
+    console.log('BACKGROUND: No newtabEnabled found, setting default to true');
+    chrome.storage.sync.set({ newtabEnabled: true });
+  } else {
+    console.log('BACKGROUND: Loaded newtabEnabled from storage:', result.newtabEnabled);
+  }
+  
+  // EMERGENCY NULL CHECK: Ensure enabled is never null after initialization
+  if (globalTimer.enabled === null || globalTimer.enabled === undefined) {
+    console.error('BACKGROUND: EMERGENCY FIX - enabled was null/undefined, forcing to true');
+    globalTimer.enabled = true;
+    chrome.storage.sync.set({ timerEnabled: true });
+  }
+  
+  if (result.timerState) {
+    globalTimer.timeLeft = result.timerState.timeLeft;
+    globalTimer.isRunning = result.timerState.isRunning;
+    globalTimer.defaultTime = result.timerState.defaultTime;
+    globalTimer.currentTask = result.timerState.currentTask || '';
+    globalTimer.mode = result.timerState.mode || 'pomodoro';
+    globalTimer.reminderFrequency = result.timerState.reminderFrequency || 2;
+    globalTimer.customReminderSound = result.timerState.customReminderSound || null;
+    
+    // Resume timer if it was running and enabled
+    if (globalTimer.isRunning && globalTimer.enabled) {
+      startGlobalTimer();
+    }
+  } else {
+    globalTimer.timeLeft = globalTimer.defaultTime;
+    // FORCE SAVE: Ensure default state is stored
+    debouncedSaveTimerState();
+  }
+
+  if (result.stopwatchState) {
+    stopwatch = result.stopwatchState;
+    if (stopwatch.isRunning) {
+      startStopwatch();
+    }
+  }
+  
+  // CRITICAL: Force broadcast initial state to all tabs after 500ms
+  setTimeout(() => {
+    console.log('BACKGROUND: Force broadcasting initial state to sync all components');
+    forceSyncAllTabs();
+  }, 500);
+});
+
+// Initialize website blocker from storage
+chrome.storage.local.get(['websiteBlockerSettings'], function(result) {
+  console.log('BACKGROUND: Initializing website blocker with stored settings:', result);
+  
+  if (result.websiteBlockerSettings) {
+    websiteBlockerState = { ...websiteBlockerState, ...result.websiteBlockerSettings };
+    console.log('BACKGROUND: Loaded existing blocker settings');
+  } else {
+    // Save default settings
+    console.log('BACKGROUND: No existing settings, saving defaults');
+    chrome.storage.local.set({ websiteBlockerSettings: websiteBlockerState }, function() {
+      if (chrome.runtime.lastError) {
+        console.error('BACKGROUND: Error saving default blocker settings:', chrome.runtime.lastError);
+      } else {
+        console.log('BACKGROUND: Default blocker settings saved successfully');
+      }
+    });
+  }
+  
+  console.log('BACKGROUND: Website blocker initialized with state:', {
+    enabled: websiteBlockerState.isEnabled,
+    blockedSites: websiteBlockerState.blockedWebsites,
+    blockedToday: websiteBlockerState.blockedToday
+  });
+  
+  // Setup website blocking listeners
+  console.log('BACKGROUND: Setting up website blocking listeners...');
+  setupWebsiteBlockingListeners();
+  console.log('BACKGROUND: Website blocking listeners setup complete');
+});
+
+// Start the global timer
+function startGlobalTimer() {
+  if (globalTimer.interval) return;
+  
+  if (globalTimer.mode === 'pomodoro') {
+    globalTimer.isRunning = true;
+    globalTimer.interval = setInterval(() => {
+      globalTimer.timeLeft--;
+      
+      // Broadcast to all tabs every second for real-time updates
+      broadcastTimerUpdate();
+      
+      // Only save state every 60 seconds instead of every second, or when timer completes/low
+      if (globalTimer.timeLeft % 60 === 0 || globalTimer.timeLeft <= 0 || globalTimer.timeLeft <= 5) {
+        debouncedSaveTimerState();
+      }
+      
+      if (globalTimer.timeLeft <= 0) {
+        stopGlobalTimer();
+        // Notify completion
+        chrome.tabs.query({}, function(tabs) {
+          tabs.forEach(tab => {
+            chrome.tabs.sendMessage(tab.id, {
+              action: 'timerComplete'
+            }).catch(() => {}); // Ignore errors for inactive tabs
+          });
+        });
+      }
+    }, 1000);
+  } else { // Stopwatch mode
+    globalTimer.isRunning = true;
+    globalTimer.interval = setInterval(() => {
+      globalTimer.timeLeft++; // Counting up
+      
+      // Broadcast stopwatch updates every second for real-time updates
+      broadcastTimerUpdate();
+      
+      // Save every 60 seconds for stopwatch
+      if (globalTimer.timeLeft % 60 === 0) {
+        debouncedSaveTimerState();
+      }
+    }, 1000);
+  }
+  startTaskReminder();
+  
+  debouncedSaveTimerState();
+}
+
+// Stop the global timer
+function stopGlobalTimer() {
+  globalTimer.isRunning = false;
+  if (globalTimer.interval) {
+    clearInterval(globalTimer.interval);
+    globalTimer.interval = null;
+  }
+  debouncedSaveTimerState();
+  stopTaskReminder();
+}
+
+// Reset the global timer
+function resetGlobalTimer() {
+  stopGlobalTimer();
+  if (globalTimer.mode === 'pomodoro') {
+    globalTimer.timeLeft = globalTimer.defaultTime;
+    globalTimer.currentTask = '';
+  } else {
+    globalTimer.timeLeft = 0;
+  }
+  broadcastTimerUpdate();
+  debouncedSaveTimerState();
+}
+
+// Broadcast timer update to all tabs (optimized)
+function broadcastTimerUpdate(source = null) {
+  console.log('BACKGROUND: Broadcasting timer update, enabled:', globalTimer.enabled, 'visible:', globalTimer.timerVisible, 'source:', source);
+  chrome.tabs.query({ status: 'complete' }, function(tabs) {
+    // Filter out chrome:// and extension:// pages that can't receive messages
+    const validTabs = tabs.filter(tab => 
+      tab.url && 
+      !tab.url.startsWith('chrome://') && 
+      !tab.url.startsWith('chrome-extension://') &&
+      !tab.url.startsWith('moz-extension://')
+    );
+    
+    console.log('BACKGROUND: Found', validTabs.length, 'valid tabs to update (filtered from', tabs.length, 'total)');
+    
+    const message = {
+      action: 'updateTimerDisplay',
+      timeLeft: globalTimer.timeLeft,
+      isRunning: globalTimer.isRunning,
+      enabled: globalTimer.enabled,
+      timerVisible: globalTimer.timerVisible,
+      currentTask: globalTimer.currentTask,
+      mode: globalTimer.mode,
+      stopwatch: stopwatch,
+      reminderFrequency: globalTimer.reminderFrequency,
+      customReminderSound: globalTimer.customReminderSound,
+      disableSource: source
+    };
+    
+    validTabs.forEach(tab => {
+      chrome.tabs.sendMessage(tab.id, message).catch(() => {
+        // Silently ignore connection errors to dead tabs
+      });
+    });
+  });
+}
+
+// FORCE SYNC: Optimized synchronization for startup and state mismatches
+function forceSyncAllTabs() {
+  console.log('BACKGROUND: Force syncing all tabs with state - enabled:', globalTimer.enabled, 'visible:', globalTimer.timerVisible);
+  chrome.tabs.query({ status: 'complete' }, function(tabs) {
+    // Filter valid tabs only
+    const validTabs = tabs.filter(tab => 
+      tab.url && 
+      !tab.url.startsWith('chrome://') && 
+      !tab.url.startsWith('chrome-extension://') &&
+      !tab.url.startsWith('moz-extension://')
+    );
+    
+    const message = {
+      action: 'forceStateSync',
+      timeLeft: globalTimer.timeLeft,
+      isRunning: globalTimer.isRunning,
+      enabled: globalTimer.enabled,
+      timerVisible: globalTimer.timerVisible,
+      currentTask: globalTimer.currentTask,
+      mode: globalTimer.mode,
+      stopwatch: stopwatch,
+      reminderFrequency: globalTimer.reminderFrequency,
+      customReminderSound: globalTimer.customReminderSound
+    };
+    
+    validTabs.forEach(tab => {
+      chrome.tabs.sendMessage(tab.id, message).catch(() => {
+        // Silently ignore connection errors
+      });
+    });
+  });
+}
+
+function startStopwatch() {
+  if (stopwatch.interval) return;
+  stopwatch.isRunning = true;
+  stopwatch.interval = setInterval(() => {
+    stopwatch.time++;
+    // Broadcast stopwatch updates every second for real-time updates
+    broadcastTimerUpdate();
+    // Save every 60 seconds for stopwatch
+    if (stopwatch.time % 60 === 0) {
+      debouncedSaveTimerState();
+    }
+  }, 1000);
+  debouncedSaveTimerState();
+}
+
+function stopStopwatch() {
+  stopwatch.isRunning = false;
+  if (stopwatch.interval) {
+    clearInterval(stopwatch.interval);
+    stopwatch.interval = null;
+  }
+  debouncedSaveTimerState();
+}
+
+function startTaskReminder() {
+    stopTaskReminder(); // Stop any existing reminder
+    if (!globalTimer.currentTask || !globalTimer.isRunning || globalTimer.reminderFrequency === 0) return;
+
+    const reminderIntervalMs = globalTimer.reminderFrequency * 60 * 1000;
+    
+    taskReminderInterval = setInterval(() => {
+        chrome.tabs.query({}, function(tabs) {
+            tabs.forEach(tab => {
+                chrome.tabs.sendMessage(tab.id, { action: 'remindTask' }).catch(() => {});
+            });
+        });
+    }, reminderIntervalMs);
+}
+
+function stopTaskReminder() {
+    if (taskReminderInterval) {
+        clearTimeout(taskReminderInterval);
+        taskReminderInterval = null;
+    }
+}
+
+// Save timer state to storage
+function saveTimerState() {
+  console.log('BACKGROUND: Saving timer state, enabled:', globalTimer.enabled, 'visible:', globalTimer.timerVisible);
+  chrome.storage.sync.set({
+    timerState: {
+      timeLeft: globalTimer.timeLeft,
+      isRunning: globalTimer.isRunning,
+      defaultTime: globalTimer.defaultTime,
+      currentTask: globalTimer.currentTask,
+      mode: globalTimer.mode,
+      reminderFrequency: globalTimer.reminderFrequency,
+      customReminderSound: globalTimer.customReminderSound
+    },
+    timerEnabled: globalTimer.enabled,
+    timerVisible: globalTimer.timerVisible, // Save the new state
+    stopwatchState: stopwatch
+  }, function() {
+    if (chrome.runtime.lastError) {
+      console.error('BACKGROUND: Error saving state:', chrome.runtime.lastError);
+    } else {
+      console.log('BACKGROUND: State saved successfully');
+    }
+  });
+}
+
+// Debounced save function
+function debouncedSaveTimerState() {
+  if (saveTimeout) {
+    clearTimeout(saveTimeout);
+  }
+  saveTimeout = setTimeout(() => {
+    saveTimerState();
+    lastSavedState = JSON.stringify(globalTimer); // Store a copy for comparison
+    pendingStateChange = false;
+    console.log('BACKGROUND: Debounced save triggered. State saved.');
+  }, 5000); // 5 second debounce time to prevent quota issues
+}
+
+// Website Blocker Functions
+function setupWebsiteBlockingListeners() {
+  console.log('BACKGROUND: Setting up website blocking listeners...', {
+    enabled: websiteBlockerState.isEnabled,
+    blockedSites: websiteBlockerState.blockedWebsites
+  });
+  
+  // Tab update listener for website blocking
+  chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+    // Always log tab updates to see if listener is working
+    if (changeInfo.status === 'complete' && tab.url) {
+      console.log('BACKGROUND: Tab updated:', { 
+        tabId, 
+        url: tab.url, 
+        blockerEnabled: websiteBlockerState.isEnabled,
+        changeInfo
+      });
+      
+      if (websiteBlockerState.isEnabled) {
+        console.log('BACKGROUND: Checking if should block:', tab.url);
+        if (shouldBlockWebsite(tab.url)) {
+          console.log('BACKGROUND: ⛔ BLOCKING website via tab update:', tab.url);
+          await blockWebsite(tabId, tab.url);
+        } else {
+          console.log('BACKGROUND: ✅ Website allowed:', tab.url);
+        }
+      } else {
+        console.log('BACKGROUND: 🔓 Website blocker disabled, allowing:', tab.url);
+      }
+    }
+  });
+  
+  // Before navigate listener for faster blocking
+  chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
+    if (details.frameId === 0) {
+      console.log('BACKGROUND: Navigation detected:', { 
+        url: details.url, 
+        tabId: details.tabId,
+        blockerEnabled: websiteBlockerState.isEnabled 
+      });
+      
+      if (websiteBlockerState.isEnabled) {
+        console.log('BACKGROUND: Checking navigation to:', details.url);
+        if (shouldBlockWebsite(details.url)) {
+          console.log('BACKGROUND: ⛔ BLOCKING navigation to:', details.url);
+          await blockWebsite(details.tabId, details.url);
+        } else {
+          console.log('BACKGROUND: ✅ Navigation allowed to:', details.url);
+        }
+      } else {
+        console.log('BACKGROUND: 🔓 Navigation blocker disabled, allowing:', details.url);
+      }
+    }
+  });
+  
+  console.log('BACKGROUND: ✅ Website blocking listeners successfully registered');
+}
+
+function shouldBlockWebsite(url) {
+  if (!websiteBlockerState.isEnabled || !url) {
+    console.log('BACKGROUND: Blocking check skipped:', { 
+      enabled: websiteBlockerState.isEnabled, 
+      hasUrl: !!url 
+    });
+    return false;
+  }
+  
+  try {
+    const urlObj = new URL(url);
+    const hostname = urlObj.hostname.toLowerCase().replace(/^www\./, '');
+    
+    console.log('BACKGROUND: Checking if should block:', { 
+      url, 
+      hostname,
+      blockedSites: websiteBlockerState.blockedWebsites 
+    });
+    
+    const shouldBlock = websiteBlockerState.blockedWebsites.some(blocked => {
+      const cleanBlocked = blocked.toLowerCase().replace(/^www\./, '');
+      const matches = hostname === cleanBlocked || 
+                     hostname.endsWith('.' + cleanBlocked) ||
+                     cleanBlocked.includes(hostname) ||
+                     hostname.includes(cleanBlocked);
+      
+      if (matches) {
+        console.log('BACKGROUND: Match found:', { hostname, blocked: cleanBlocked });
+      }
+      
+      return matches;
+    });
+    
+    console.log('BACKGROUND: Should block result:', shouldBlock);
+    return shouldBlock;
+  } catch (error) {
+    console.error('BACKGROUND: Error checking URL:', error);
+    return false;
+  }
+}
+
+async function blockWebsite(tabId, url) {
+  try {
+    // Increment blocked counter
+    websiteBlockerState.blockedToday++;
+    await saveWebsiteBlockerState();
+    
+    // Check if new tab is enabled
+    chrome.storage.sync.get(['newtabEnabled'], function(result) {
+      const newtabEnabled = result.newtabEnabled !== undefined ? result.newtabEnabled : true;
+      
+      if (newtabEnabled) {
+        // Redirect to our new tab page with blocked message
+        const extensionUrl = chrome.runtime.getURL('newtab.html') + '?blocked=' + encodeURIComponent(url);
+        chrome.tabs.update(tabId, { url: extensionUrl });
+        console.log('BACKGROUND: Successfully blocked and redirected to new tab:', url);
+      } else {
+        // Create a black screen using data URL
+        const blackScreenHTML = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>Site Blocked</title>
+            <style>
+              body {
+                margin: 0;
+                padding: 0;
+                background: #000000;
+                color: #ffffff;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                height: 100vh;
+                text-align: center;
+              }
+              .blocked-message {
+                max-width: 400px;
+                padding: 40px;
+              }
+              .blocked-title {
+                font-size: 24px;
+                font-weight: 600;
+                margin-bottom: 16px;
+                color: #FFA500;
+              }
+              .blocked-url {
+                font-size: 14px;
+                color: #888;
+                word-break: break-all;
+                margin-bottom: 20px;
+              }
+              .blocked-info {
+                font-size: 16px;
+                line-height: 1.5;
+                opacity: 0.8;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="blocked-message">
+              <div class="blocked-title">🚫 Site Blocked</div>
+              <div class="blocked-url">${url}</div>
+              <div class="blocked-info">This website has been blocked to help you stay focused.</div>
+            </div>
+          </body>
+          </html>
+        `;
+        
+        const dataUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(blackScreenHTML);
+        chrome.tabs.update(tabId, { url: dataUrl });
+        console.log('BACKGROUND: Successfully blocked and redirected to black screen:', url);
+      }
+    });
+  } catch (error) {
+    console.error('BACKGROUND: Error blocking website:', error);
+  }
+}
+
+function saveWebsiteBlockerState() {
+  return new Promise((resolve) => {
+    chrome.storage.local.set({ websiteBlockerSettings: websiteBlockerState }, function() {
+      if (chrome.runtime.lastError) {
+        console.error('BACKGROUND: Error saving website blocker state:', chrome.runtime.lastError);
+      } else {
+        console.log('BACKGROUND: Website blocker state saved successfully');
+      }
+      resolve();
+    });
+  });
+}
+
 // Listen for messages from content scripts
 chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
   console.log('BACKGROUND: Received message:', request.action, 'from', sender.tab ? `tab ${sender.tab.id}` : 'popup/extension');
@@ -575,33 +728,33 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
       
     case 'getTimerState':
       const state = {
-        timeLeft: timerState.timeLeft,
-        isRunning: timerState.isRunning,
-        defaultTime: timerState.defaultTime,
-        enabled: timerState.enabled,
-        timerVisible: true, // Always visible in background
-        currentTask: timerState.currentTask,
-        mode: timerState.mode,
-        reminderFrequency: timerState.reminderFrequency,
-        customReminderSound: timerState.customReminderSound
+        timeLeft: globalTimer.timeLeft,
+        isRunning: globalTimer.isRunning,
+        defaultTime: globalTimer.defaultTime,
+        enabled: globalTimer.enabled,
+        timerVisible: globalTimer.timerVisible, // Include the new state
+        currentTask: globalTimer.currentTask,
+        mode: globalTimer.mode,
+        reminderFrequency: globalTimer.reminderFrequency,
+        customReminderSound: globalTimer.customReminderSound
       };
       console.log('BACKGROUND: Sending timer state:', state);
       sendResponse(state);
       break;
       
     case 'startTimer':
-      console.log('BACKGROUND: Starting timer, enabled:', timerState.enabled);
-      if (timerState.enabled) {
+      console.log('BACKGROUND: Starting timer, enabled:', globalTimer.enabled, 'visible:', globalTimer.timerVisible);
+      if (globalTimer.enabled) {
         startGlobalTimer();
-        broadcastTimerUpdate('timerStart');
+        broadcastTimerUpdate();
       }
-      sendResponse({ success: true, enabled: timerState.enabled });
+      sendResponse({ success: true, enabled: globalTimer.enabled, timerVisible: globalTimer.timerVisible });
       break;
       
     case 'stopTimer':
       console.log('BACKGROUND: Stopping timer');
       stopGlobalTimer();
-      broadcastTimerUpdate('timerStop');
+      broadcastTimerUpdate();
       sendResponse({ success: true });
       break;
       
@@ -612,72 +765,72 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
       break;
       
     case 'switchMode':
-      console.log('BACKGROUND: Switching mode from', timerState.mode);
+      console.log('BACKGROUND: Switching mode from', globalTimer.mode);
       stopGlobalTimer();
-      if (timerState.mode === 'pomodoro') {
-        timerState.mode = 'stopwatch';
-        timerState.timeLeft = 0;
+      if (globalTimer.mode === 'pomodoro') {
+        globalTimer.mode = 'stopwatch';
+        globalTimer.timeLeft = 0;
       } else {
-        timerState.mode = 'pomodoro';
-        timerState.timeLeft = timerState.defaultTime;
+        globalTimer.mode = 'pomodoro';
+        globalTimer.timeLeft = globalTimer.defaultTime;
       }
-      broadcastTimerUpdate('modeSwitch');
+      broadcastTimerUpdate();
       debouncedSaveTimerState();
-      sendResponse({ success: true, mode: timerState.mode });
+      sendResponse({ success: true, mode: globalTimer.mode });
       break;
       
     case 'updateDuration':
       console.log('BACKGROUND: Updating duration to', request.duration, 'minutes');
-      timerState.defaultTime = request.duration * 60;
+      globalTimer.defaultTime = request.duration * 60;
       resetGlobalTimer();
       sendResponse({ success: true });
       break;
       
     case 'setTask':
       console.log('BACKGROUND: Setting task to:', request.task);
-      timerState.currentTask = request.task;
-      if (timerState.currentTask) {
+      globalTimer.currentTask = request.task;
+      if (globalTimer.currentTask) {
           startTaskReminder();
       } else {
           stopTaskReminder();
       }
       debouncedSaveTimerState();
-      broadcastTimerUpdate('taskUpdate');
-      sendResponse({ success: true, task: timerState.currentTask });
+      broadcastTimerUpdate();
+      sendResponse({ success: true, task: globalTimer.currentTask });
       break;
       
     case 'toggleEnabled':
       // This is for the popup toggle - controls the main enabled state
-      console.log('BACKGROUND: Toggle enabled from', timerState.enabled, 'to', request.enabled, 'source:', request.source);
-      timerState.enabled = request.enabled;
+      console.log('BACKGROUND: Toggle enabled from', globalTimer.enabled, 'to', request.enabled, 'source:', request.source);
+      globalTimer.enabled = request.enabled;
       // When disabled via popup, also hide the timer
       if (!request.enabled) {
-        // No-op, visibility is controlled by the X button
+        globalTimer.timerVisible = false;
       } else {
         // When enabled via popup, make timer visible
-        // No-op, visibility is controlled by the X button
+        globalTimer.timerVisible = true;
       }
       debouncedSaveTimerState();
-      broadcastTimerUpdate('enabledToggle');
-      sendResponse({ success: true, enabled: timerState.enabled });
+      broadcastTimerUpdate(request.source === 'popupToggle' ? 'popupToggle' : request.source);
+      sendResponse({ success: true, enabled: globalTimer.enabled, timerVisible: globalTimer.timerVisible });
       break;
       
     case 'toggleVisible':
       // This is for the X button - only controls visibility, not enabled state
-      console.log('BACKGROUND: Toggle visible from', true, 'to', request.visible, 'source:', request.source); // Always visible in background
-      // No-op, visibility is controlled by the X button
+      console.log('BACKGROUND: Toggle visible from', globalTimer.timerVisible, 'to', request.visible, 'source:', request.source);
+      globalTimer.timerVisible = request.visible;
       debouncedSaveTimerState();
-      broadcastTimerUpdate('visibleToggle');
-      sendResponse({ success: true, enabled: timerState.enabled, timerVisible: true });
+      broadcastTimerUpdate(request.source);
+      sendResponse({ success: true, enabled: globalTimer.enabled, timerVisible: globalTimer.timerVisible });
       break;
       
     case 'getEnabled':
-      sendResponse({ enabled: timerState.enabled, timerVisible: true });
+      sendResponse({ enabled: globalTimer.enabled, timerVisible: globalTimer.timerVisible });
       break;
       
     case 'toggleStopwatch':
       console.log('BACKGROUND: Toggling stopwatch');
-      if (timerState.mode === 'stopwatch') {
+      if (stopwatch.isRunning) {
         stopStopwatch();
       } else {
         startStopwatch();
@@ -687,25 +840,25 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
       
     case 'updateReminderFrequency':
       console.log('BACKGROUND: Updating reminder frequency to', request.frequency);
-      timerState.reminderFrequency = request.frequency;
-      if (timerState.isRunning && timerState.currentTask) {
+      globalTimer.reminderFrequency = request.frequency;
+      if (globalTimer.isRunning && globalTimer.currentTask) {
         startTaskReminder(); // Restart with new frequency
       }
       debouncedSaveTimerState();
-      broadcastTimerUpdate('reminderFrequencyUpdate');
+      broadcastTimerUpdate();
       sendResponse({ success: true });
       break;
       
     case 'setCustomSound':
         console.log('BACKGROUND: Setting custom sound');
-        timerState.customReminderSound = request.sound;
+        globalTimer.customReminderSound = request.sound;
         debouncedSaveTimerState();
         sendResponse({ success: true });
         break;
 
     case 'removeCustomSound':
         console.log('BACKGROUND: Removing custom sound');
-        timerState.customReminderSound = null;
+        globalTimer.customReminderSound = null;
         debouncedSaveTimerState();
         sendResponse({ success: true });
         break;
@@ -735,16 +888,16 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
     case 'reportTimerState':
       // TIMER CONTROLS POPUP: Content script reports actual timer visibility
       console.log('BACKGROUND: Timer reporting its actual state:', request);
-      console.log('BACKGROUND: Current stored visible state before update:', true); // Always visible
+      console.log('BACKGROUND: Current stored visible state before update:', globalTimer.timerVisible);
       console.log('BACKGROUND: Timer says it is actually visible:', request.actuallyVisible);
       
       // CRITICAL FIX: Ensure we only accept boolean values, never null/undefined
       if (typeof request.actuallyVisible === 'boolean') {
         // Timer is the authority for visibility - if it reports different state, sync everything
-        if (true !== request.actuallyVisible) { // Always visible in background
-          console.log('BACKGROUND: Timer visibility mismatch detected! Timer says:', request.actuallyVisible, 'Background says:', true);
+        if (globalTimer.timerVisible !== request.actuallyVisible) {
+          console.log('BACKGROUND: Timer visibility mismatch detected! Timer says:', request.actuallyVisible, 'Background says:', globalTimer.timerVisible);
           console.log('BACKGROUND: Updating stored visible state to match timer reality:', request.actuallyVisible);
-          // No-op, visibility is controlled by the X button
+          globalTimer.timerVisible = request.actuallyVisible;
           debouncedSaveTimerState();
           // Force sync popup and other tabs
           forceSyncAllTabs();
@@ -763,23 +916,41 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
       forceSyncAllTabs();
       sendResponse({ success: true });
       break;
-
+      
     case 'toggleWebsiteBlocker':
-      handleWebsiteBlockerToggle(request.enabled, request.settings);
-      sendResponse({ success: true });
+      console.log('BACKGROUND: Toggling website blocker to:', request.enabled);
+      websiteBlockerState.isEnabled = request.enabled;
+      websiteBlockerState.blockedWebsites = request.blockedWebsites || websiteBlockerState.blockedWebsites;
+      saveWebsiteBlockerState();
+      sendResponse({ success: true, enabled: websiteBlockerState.isEnabled });
       break;
-
+      
+    case 'updateWebsiteBlocker':
+      console.log('BACKGROUND: Updating website blocker settings');
+      websiteBlockerState.isEnabled = request.enabled;
+      websiteBlockerState.blockedWebsites = request.blockedWebsites || [];
+      saveWebsiteBlockerState();
+      sendResponse({ success: true, enabled: websiteBlockerState.isEnabled, blockedWebsites: websiteBlockerState.blockedWebsites });
+      break;
+      
     case 'getWebsiteBlockerState':
       sendResponse({ 
-          success: true, 
-          state: websiteBlockerState 
+        isEnabled: websiteBlockerState.isEnabled,
+        blockedWebsites: websiteBlockerState.blockedWebsites,
+        blockedToday: websiteBlockerState.blockedToday
       });
       break;
-
-    case 'updateWebsiteBlockerSettings':
-      websiteBlockerState = { ...websiteBlockerState, ...request.settings };
-      saveWebsiteBlockerState();
-      sendResponse({ success: true });
+      
+    case 'testWebsiteBlocking':
+      console.log('BACKGROUND: Testing website blocking for:', request.url);
+      const testResult = shouldBlockWebsite(request.url);
+      console.log('BACKGROUND: Test result for', request.url, ':', testResult);
+      sendResponse({ 
+        url: request.url,
+        shouldBlock: testResult,
+        enabled: websiteBlockerState.isEnabled,
+        blockedSites: websiteBlockerState.blockedWebsites
+      });
       break;
   }
 });
@@ -796,453 +967,3 @@ chrome.runtime.onSuspend.addListener(function() {
   // Force immediate save on suspend - no debouncing
   saveTimerState();
 });
-
-function startGlobalTimer() {
-    console.log('BACKGROUND: Starting global timer. Current state:', timerState);
-    
-    // Stop any existing timer
-    if (globalTimerInterval) {
-        clearInterval(globalTimerInterval);
-    }
-    
-    // Set running state and start time
-    timerState.isRunning = true;
-    timerState.startTime = Date.now();
-    
-    // Start task reminder if enabled
-    startTaskReminder();
-    
-    globalTimerInterval = setInterval(() => {
-        if (timerState.mode === 'pomodoro') {
-            timerState.timeLeft--;
-            timerState.totalSessionTime++;
-            
-            if (timerState.timeLeft <= 0) {
-                console.log('BACKGROUND: Pomodoro completed');
-                stopGlobalTimer();
-                // Optionally reset for next session
-                timerState.timeLeft = timerState.defaultTime;
-            }
-        } else {
-            // Stopwatch mode
-            timerState.stopwatch.sessionTime++;
-            timerState.stopwatch.totalTime++;
-            timerState.timeLeft = timerState.stopwatch.sessionTime; // Use for display
-        }
-        
-        // Save state every 30 seconds to avoid too frequent writes
-        if (timerState.totalSessionTime % 30 === 0 || timerState.stopwatch.sessionTime % 30 === 0) {
-            debouncedSaveTimerState();
-        }
-        
-        // Broadcast update
-        broadcastTimerUpdate('timerTick');
-    }, 1000);
-    
-    saveTimerState();
-    broadcastTimerUpdate('timerStart');
-    console.log('BACKGROUND: Global timer started');
-}
-
-function stopGlobalTimer() {
-    console.log('BACKGROUND: Stopping global timer');
-    
-    if (globalTimerInterval) {
-        clearInterval(globalTimerInterval);
-        globalTimerInterval = null;
-    }
-    
-    timerState.isRunning = false;
-    stopTaskReminder();
-    
-    saveTimerState();
-    broadcastTimerUpdate('timerStop');
-    console.log('BACKGROUND: Global timer stopped');
-}
-
-function resetGlobalTimer() {
-    console.log('BACKGROUND: Resetting global timer');
-    
-    stopGlobalTimer();
-    
-    if (timerState.mode === 'pomodoro') {
-        timerState.timeLeft = timerState.defaultTime;
-    } else {
-        timerState.stopwatch.sessionTime = 0;
-        timerState.timeLeft = 0;
-    }
-    
-    timerState.startTime = null;
-    
-    saveTimerState();
-    broadcastTimerUpdate('timerReset');
-    console.log('BACKGROUND: Global timer reset');
-}
-
-function broadcastTimerUpdate(source = null) {
-    const updateData = {
-        enabled: timerState.enabled,
-        timeLeft: timerState.timeLeft,
-        defaultTime: timerState.defaultTime,
-        isRunning: timerState.isRunning,
-        mode: timerState.mode,
-        currentTask: timerState.currentTask,
-        totalSessionTime: timerState.totalSessionTime,
-        stopwatch: timerState.stopwatch,
-        reminderFrequency: timerState.reminderFrequency,
-        customReminderSound: timerState.customReminderSound,
-        source: source
-    };
-    
-    console.log('BACKGROUND: Broadcasting timer update:', updateData);
-    
-    // Send to all tabs
-    chrome.tabs.query({}, (tabs) => {
-        tabs.forEach((tab) => {
-            chrome.tabs.sendMessage(tab.id, {
-                type: 'timerUpdate',
-                data: updateData
-            }).catch(() => {
-                // Ignore errors for tabs that don't have content script
-            });
-        });
-    });
-    
-    // Send to popup if open
-    chrome.runtime.sendMessage({
-        type: 'timerUpdate',
-        data: updateData
-    }).catch(() => {
-        // Popup might not be open
-    });
-}
-
-function forceSyncAllTabs() {
-    console.log('BACKGROUND: Force syncing all tabs');
-    
-    chrome.tabs.query({}, (tabs) => {
-        tabs.forEach((tab) => {
-            chrome.tabs.sendMessage(tab.id, {
-                type: 'forceSync',
-                data: {
-                    enabled: timerState.enabled,
-                    timeLeft: timerState.timeLeft,
-                    defaultTime: timerState.defaultTime,
-                    isRunning: timerState.isRunning,
-                    mode: timerState.mode,
-                    currentTask: timerState.currentTask,
-                    totalSessionTime: timerState.totalSessionTime,
-                    stopwatch: timerState.stopwatch,
-                    reminderFrequency: timerState.reminderFrequency,
-                    customReminderSound: timerState.customReminderSound
-                }
-            }).catch(() => {
-                // Ignore errors for tabs that don't have content script
-            });
-        });
-    });
-}
-
-function startStopwatch() {
-    console.log('BACKGROUND: Starting stopwatch mode');
-    
-    timerState.mode = 'stopwatch';
-    timerState.stopwatch.startTime = Date.now();
-    timerState.isRunning = true;
-    timerState.timeLeft = timerState.stopwatch.sessionTime;
-    
-    // Use the same global timer but different logic
-    startGlobalTimer();
-}
-
-function stopStopwatch() {
-    console.log('BACKGROUND: Stopping stopwatch mode');
-    stopGlobalTimer();
-}
-
-function startTaskReminder() {
-    if (timerState.reminderFrequency > 0 && timerState.currentTask) {
-        stopTaskReminder(); // Clear any existing reminder
-        
-        const reminderInterval = timerState.reminderFrequency * 60 * 1000; // Convert to milliseconds
-        timerState.reminderIntervalId = setInterval(() => {
-            console.log('BACKGROUND: Task reminder triggered');
-            // Send reminder to all tabs
-            broadcastTimerUpdate('taskReminder');
-        }, reminderInterval);
-        
-        console.log(`BACKGROUND: Task reminder started (${timerState.reminderFrequency} min intervals)`);
-    }
-}
-
-function stopTaskReminder() {
-    if (timerState.reminderIntervalId) {
-        clearInterval(timerState.reminderIntervalId);
-        timerState.reminderIntervalId = null;
-        console.log('BACKGROUND: Task reminder stopped');
-    }
-}
-
-function saveTimerState() {
-    console.log('BACKGROUND: Saving timer state');
-    chrome.storage.local.set({
-        timerState: {
-            enabled: timerState.enabled,
-            timeLeft: timerState.timeLeft,
-            defaultTime: timerState.defaultTime,
-            isRunning: timerState.isRunning,
-            mode: timerState.mode,
-            currentTask: timerState.currentTask,
-            totalSessionTime: timerState.totalSessionTime,
-            stopwatch: timerState.stopwatch,
-            reminderFrequency: timerState.reminderFrequency,
-            customReminderSound: timerState.customReminderSound
-        }
-    }).catch((error) => {
-        console.error('BACKGROUND: Error saving timer state:', error);
-    });
-}
-
-// Debounced save to reduce storage writes
-let saveTimerTimeout = null;
-function debouncedSaveTimerState() {
-    if (saveTimerTimeout) {
-        clearTimeout(saveTimerTimeout);
-    }
-    saveTimerTimeout = setTimeout(() => {
-        saveTimerState();
-    }, 1000);
-}
-
-async function loadTimerState() {
-    try {
-        console.log('BACKGROUND: Loading timer state from storage');
-        const result = await chrome.storage.local.get(['timerState']);
-        
-        if (result.timerState) {
-            // Restore most state but not running state
-            timerState = {
-                ...timerState,
-                ...result.timerState,
-                isRunning: false, // Never restore running state
-                startTime: null
-            };
-            
-            // Clear any reminder interval
-            timerState.reminderIntervalId = null;
-            
-            console.log('BACKGROUND: Timer state loaded:', timerState);
-        } else {
-            console.log('BACKGROUND: No saved timer state found, using defaults');
-            // Save initial state
-            saveTimerState();
-        }
-    } catch (error) {
-        console.error('BACKGROUND: Error loading timer state:', error);
-    }
-}
-
-// Auto-save timer state every 5 minutes when running
-setInterval(() => {
-    if (timerState.isRunning) {
-        console.log('BACKGROUND: Auto-saving timer state');
-        saveTimerState();
-    }
-}, 5 * 60 * 1000);
-
-// Handle storage changes from other sources
-chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === 'local' && changes.timerState && changes.timerState.newValue) {
-        console.log('BACKGROUND: Timer state changed externally');
-        // Don't override local state if we're actively running
-        if (!timerState.isRunning) {
-            const newState = changes.timerState.newValue;
-            timerState = {
-                ...timerState,
-                ...newState,
-                isRunning: false // Never allow external running state
-            };
-            console.log('BACKGROUND: Timer state updated from external change');
-        }
-    }
-});
-
-// Clean up navigation tabs when they're closed
-chrome.tabs.onRemoved.addListener((tabId) => {
-  if (navigationTabs.has(tabId)) {
-    console.log('BACKGROUND: Cleaning up closed navigation tab:', tabId);
-    navigationTabs.delete(tabId);
-  }
-});
-
-// Listen for tab updates to redirect new tab pages when enabled
-chrome.tabs.onUpdated.addListener(function(tabId, changeInfo, tab) {
-    // Only proceed if the tab has finished loading
-    if (changeInfo.status !== 'complete') return;
-    
-    // Skip if URL is undefined or not a new tab
-    if (!tab.url) return;
-    
-    // Enhanced new tab detection
-    const isNewTab = tab.url === 'chrome://newtab/' || 
-                     tab.url === 'chrome://new-tab-page/' ||
-                     tab.url === 'edge://newtab/' ||
-                     tab.url === 'about:newtab' ||
-                     tab.url === 'about:home';
-    
-    if (isNewTab) {
-        console.log('BACKGROUND: New tab detected:', tab.url);
-        redirectToTimer(tabId);
-    }
-});
-
-// Handle tab activation (switching between tabs)
-chrome.tabs.onActivated.addListener(function(activeInfo) {
-    chrome.tabs.get(activeInfo.tabId, function(tab) {
-        if (chrome.runtime.lastError) {
-            console.log('BACKGROUND: Error getting tab info:', chrome.runtime.lastError);
-            return;
-        }
-        
-        // Enhanced new tab detection for activated tabs
-        const isNewTab = tab.url === 'chrome://newtab/' || 
-                         tab.url === 'chrome://new-tab-page/' ||
-                         tab.url === 'edge://newtab/' ||
-                         tab.url === 'about:newtab' ||
-                         tab.url === 'about:home';
-        
-        if (isNewTab) {
-            console.log('BACKGROUND: Activated new tab detected:', tab.url);
-            redirectToTimer(activeInfo.tabId);
-        }
-    });
-});
-
-// Message handling for both timer and website blocker
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    console.log('BACKGROUND: Message received:', request);
-    
-    // Website blocker messages
-    if (request.action === 'toggleWebsiteBlocker') {
-        handleWebsiteBlockerToggle(request.enabled, request.settings);
-        sendResponse({ success: true });
-        return;
-    }
-    
-    if (request.action === 'getWebsiteBlockerState') {
-        sendResponse({ 
-            success: true, 
-            state: websiteBlockerState 
-        });
-        return;
-    }
-    
-    if (request.action === 'updateWebsiteBlockerSettings') {
-        websiteBlockerState = { ...websiteBlockerState, ...request.settings };
-        saveWebsiteBlockerState();
-        sendResponse({ success: true });
-        return;
-    }
-    
-    // Timer messages (existing functionality)
-    if (request.action === 'getTimerState') {
-        const response = {
-            enabled: timerState.enabled,
-            timeLeft: timerState.timeLeft,
-            defaultTime: timerState.defaultTime,
-            isRunning: timerState.isRunning,
-            mode: timerState.mode,
-            currentTask: timerState.currentTask,
-            totalSessionTime: timerState.totalSessionTime,
-            stopwatch: timerState.stopwatch,
-            reminderFrequency: timerState.reminderFrequency,
-            customReminderSound: timerState.customReminderSound
-        };
-        console.log('BACKGROUND: Sending timer state:', response);
-        sendResponse(response);
-        return;
-    }
-    
-    // Other existing timer functionality...
-    switch(request.action) {
-        case 'startTimer':
-            startGlobalTimer();
-            break;
-        case 'stopTimer':
-            stopGlobalTimer();
-            break;
-        case 'resetTimer':
-            resetGlobalTimer();
-            break;
-        case 'updateDuration':
-            if (request.duration && request.duration >= 1 && request.duration <= 90) {
-                timerState.defaultTime = request.duration * 60;
-                if (!timerState.isRunning) {
-                    timerState.timeLeft = timerState.defaultTime;
-                }
-                saveTimerState();
-                broadcastTimerUpdate('durationUpdate');
-            }
-            break;
-        case 'setTask':
-            timerState.currentTask = request.task || '';
-            saveTimerState();
-            broadcastTimerUpdate('taskUpdate');
-            break;
-        case 'switchMode':
-            if (timerState.mode === 'pomodoro') {
-                startStopwatch();
-            } else {
-                stopStopwatch();
-                timerState.mode = 'pomodoro';
-                timerState.timeLeft = timerState.defaultTime;
-                timerState.isRunning = false;
-                if (globalTimerInterval) {
-                    clearInterval(globalTimerInterval);
-                    globalTimerInterval = null;
-                }
-            }
-            saveTimerState();
-            broadcastTimerUpdate('modeSwitch');
-            break;
-        case 'toggleEnabled':
-            timerState.enabled = request.enabled;
-            console.log('BACKGROUND: Timer enabled state changed to:', timerState.enabled);
-            saveTimerState();
-            broadcastTimerUpdate('enabledToggle');
-            break;
-        case 'forceStateReset':
-            console.log('BACKGROUND: Force resetting timer state');
-            timerState.isRunning = false;
-            if (globalTimerInterval) {
-                clearInterval(globalTimerInterval);
-                globalTimerInterval = null;
-            }
-            saveTimerState();
-            broadcastTimerUpdate('forceReset');
-            break;
-    }
-    
-    sendResponse({ success: true });
-});
-
-// Function to dynamically update new tab override
-async function updateManifestNewtab(enabled) {
-    console.log('BACKGROUND: Updating new tab override to:', enabled);
-    try {
-        // Note: In MV3, we can't dynamically modify the manifest
-        // The override is handled by detecting and redirecting new tab pages
-        // This function is kept for compatibility but doesn't modify manifest
-        
-        // Store the preference
-        await chrome.storage.sync.set({ newtabEnabled: enabled });
-        console.log('BACKGROUND: New tab preference saved:', enabled);
-    } catch (error) {
-        console.error('BACKGROUND: Error updating new tab preference:', error);
-    }
-}
-
-console.log('BACKGROUND: Service worker setup complete');
-
-// Initialize on startup
-initializeExtension();

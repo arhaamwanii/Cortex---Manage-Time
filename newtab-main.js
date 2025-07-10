@@ -17,13 +17,26 @@ function debugLog(message, data = null) {
 }
 
 // DOM elements
-let loadingMessage, errorMessage, timerContainer;
+let loadingMessage, errorMessage, timerContainer, blockedMessage;
+
+// Check for blocked URL parameter
+function checkBlockedUrl() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const blockedUrl = urlParams.get('blocked');
+    
+    if (blockedUrl) {
+        showBlockedMessage(blockedUrl);
+        return true;
+    }
+    return false;
+}
 
 // UI State Management
 function hideAllMessages() {
     if (loadingMessage) loadingMessage.style.display = 'none';
     if (errorMessage) errorMessage.style.display = 'none';
     if (timerContainer) timerContainer.style.display = 'none';
+    if (blockedMessage) blockedMessage.style.display = 'none';
 }
 
 function showLoading(message = null) {
@@ -55,6 +68,80 @@ function showTimer() {
         isInitialized = true;
         debugLog('Timer displayed successfully');
     }
+}
+
+function showBlockedMessage(blockedUrl) {
+    hideAllMessages();
+    if (!blockedMessage) {
+        createBlockedMessage();
+    }
+    
+    // Update the blocked URL in the message
+    const urlSpan = blockedMessage.querySelector('.blocked-url');
+    if (urlSpan) {
+        urlSpan.textContent = blockedUrl;
+    }
+    
+    blockedMessage.style.display = 'block';
+    debugLog('Showing blocked message for URL:', blockedUrl);
+}
+
+function createBlockedMessage() {
+    blockedMessage = document.createElement('div');
+    blockedMessage.className = 'blocked-message';
+    blockedMessage.style.cssText = `
+        display: none;
+        text-align: center;
+        color: #ffffff;
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 40px 20px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        backdrop-filter: blur(10px);
+    `;
+    
+    blockedMessage.innerHTML = `
+        <div style="font-size: 48px; margin-bottom: 20px;">🚫</div>
+        <h2 style="color: #FFA500; margin-bottom: 16px; font-size: 24px;">Website Blocked</h2>
+        <p style="color: #cccccc; margin-bottom: 8px; font-size: 16px;">
+            <span class="blocked-url" style="color: #FFA500; font-weight: 600;"></span> is currently blocked.
+        </p>
+        <p style="color: #888; margin-bottom: 30px; font-size: 14px;">
+            Stay focused on your current task. You can manage blocked sites in the extension popup.
+        </p>
+        <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+            <button onclick="history.back()" style="
+                background: rgba(255, 255, 255, 0.1);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                color: #ffffff;
+                padding: 12px 24px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-size: 14px;
+                transition: all 0.3s ease;
+            " onmouseover="this.style.background='rgba(255, 255, 255, 0.15)'" onmouseout="this.style.background='rgba(255, 255, 255, 0.1)'">
+                ← Go Back
+            </button>
+            <button onclick="window.location.href='chrome://newtab/'" style="
+                background: #FFA500;
+                border: none;
+                color: #000000;
+                padding: 12px 24px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-size: 14px;
+                font-weight: 600;
+                transition: all 0.3s ease;
+            " onmouseover="this.style.background='#FF8C00'" onmouseout="this.style.background='#FFA500'">
+                New Tab
+            </button>
+        </div>
+    `;
+    
+    document.body.appendChild(blockedMessage);
+    debugLog('Created blocked message element');
 }
 
 // Create EXACT same timer as floating version - using CSS classes
@@ -456,6 +543,12 @@ function updateSearchSuggestion() {
 // Initialize when DOM is ready
 function initialize() {
     debugLog('Initializing newtab timer...');
+    
+    // Check if this is a blocked URL first
+    if (checkBlockedUrl()) {
+        debugLog('Blocked URL detected, showing blocked message instead of timer');
+        return;
+    }
     
     // Get DOM elements
     loadingMessage = document.getElementById('loadingMessage');

@@ -12,34 +12,51 @@
         }
 
         html, body {
-            overflow: hidden !important; /* Force hide scrollbar */
-            scrollbar-width: none; /* Firefox */
-            -ms-overflow-style: none; /* IE/Edge */
+            scrollbar-width: thin; /* Firefox - allow thin scrollbar */
+            -ms-overflow-style: auto; /* IE/Edge - allow scrollbar */
         }
 
-        /* Webkit browsers scrollbar hiding */
+        /* Webkit browsers - style scrollbar */
         html::-webkit-scrollbar,
         body::-webkit-scrollbar,
-        *::-webkit-scrollbar {
-            display: none !important;
-            width: 0 !important;
-            height: 0 !important;
+        .container::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        html::-webkit-scrollbar-track,
+        body::-webkit-scrollbar-track,
+        .container::-webkit-scrollbar-track {
+            background: #111;
+        }
+
+        html::-webkit-scrollbar-thumb,
+        body::-webkit-scrollbar-thumb,
+        .container::-webkit-scrollbar-thumb {
+            background: #444;
+            border-radius: 2px;
+        }
+
+        html::-webkit-scrollbar-thumb:hover,
+        body::-webkit-scrollbar-thumb:hover,
+        .container::-webkit-scrollbar-thumb:hover {
+            background: #666;
         }
 
         body {
             width: 380px;
-            height: 600px; /* Fixed height to prevent overflow */
+            min-height: 600px; /* Minimum height, allow expansion */
+            max-height: 700px; /* Maximum height before scrolling */
             background: #000000;
             color: #ffffff;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             font-size: 14px;
-            overflow: hidden; /* Completely hide scrollbar */
+            overflow-y: auto; /* Allow vertical scrolling */
         }
 
         .container {
             padding: 20px;
-            height: 100%;
-            overflow: hidden;
+            padding-bottom: 10px; /* Reduce bottom padding */
+            overflow-y: auto; /* Allow scrolling within container */
         }
 
         .header {
@@ -285,6 +302,271 @@
             margin-bottom: 20px;
         }
 
+        /* Website Blocker Bar */
+        .blocker-bar {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 12px 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .blocker-bar:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .blocker-bar.active {
+            border-color: rgba(255, 165, 0, 0.3);
+            background: rgba(255, 165, 0, 0.05);
+        }
+
+        .blocker-toggle {
+            width: 36px;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            position: relative;
+            transition: all 0.3s ease;
+            flex-shrink: 0;
+        }
+
+        .blocker-toggle.active {
+            background: #FFA500;
+        }
+
+        .blocker-toggle .slider {
+            width: 16px;
+            height: 16px;
+            background: #ffffff;
+            border-radius: 50%;
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            transition: all 0.3s ease;
+        }
+
+        .blocker-toggle.active .slider {
+            transform: translateX(16px);
+            background: #000000;
+        }
+
+        .blocker-info {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .blocker-status {
+            font-size: 12px;
+            font-weight: 600;
+            color: #ffffff;
+        }
+
+        .blocker-status.inactive {
+            color: #888;
+        }
+
+        .blocked-sites-preview {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .site-icon {
+            width: 18px;
+            height: 18px;
+            border-radius: 3px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .site-icon.placeholder {
+            background: rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: #888;
+        }
+
+        .blocked-count {
+            font-size: 11px;
+            color: #888;
+            margin-left: 4px;
+        }
+
+        .dropdown-arrow {
+            font-size: 12px;
+            color: #888;
+            transition: transform 0.3s ease;
+        }
+
+        .blocker-bar.expanded .dropdown-arrow {
+            transform: rotate(180deg);
+        }
+
+        /* Blocker Dropdown */
+        .blocker-dropdown {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-top: none;
+            border-radius: 0 0 10px 10px;
+            padding: 16px;
+            margin-top: -1px;
+            display: none;
+            animation: slideDown 0.3s ease;
+        }
+
+        .blocker-dropdown.visible {
+            display: block;
+        }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .sites-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .site-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            padding: 12px 8px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .site-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .site-item.blocked {
+            background: rgba(255, 107, 107, 0.1);
+            border-color: rgba(255, 107, 107, 0.3);
+        }
+
+        .site-item.blocked:hover {
+            background: rgba(255, 107, 107, 0.15);
+        }
+
+        .site-item .site-icon {
+            width: 24px;
+            height: 24px;
+        }
+
+        .site-name {
+            font-size: 10px;
+            color: #ccc;
+            text-align: center;
+            line-height: 1.2;
+        }
+
+        .site-item.blocked .site-name {
+            color: #ff6b6b;
+            font-weight: 600;
+        }
+
+        .custom-sites-section {
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            padding-top: 12px;
+        }
+
+        .custom-input-container {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .custom-input {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #fff;
+            padding: 8px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+        }
+
+        .custom-input::placeholder {
+            color: #666;
+        }
+
+        .custom-input:focus {
+            outline: none;
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .add-btn {
+            background: rgba(255, 165, 0, 0.2);
+            border: 1px solid rgba(255, 165, 0, 0.3);
+            color: #FFA500;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .add-btn:hover {
+            background: rgba(255, 165, 0, 0.3);
+            border-color: rgba(255, 165, 0, 0.5);
+        }
+
+        .custom-sites-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 100px;
+            overflow-y: auto;
+        }
+
+        .custom-site-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 8px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            font-size: 11px;
+        }
+
+        .custom-site-url {
+            color: #ccc;
+            font-family: monospace;
+        }
+
+        .remove-btn {
+            background: none;
+            border: none;
+            color: #ff6b6b;
+            cursor: pointer;
+            padding: 2px;
+            font-size: 14px;
+            transition: color 0.2s ease;
+        }
+
+        .remove-btn:hover {
+            color: #ff4444;
+        }
+
         /* Toggle Cards */
         .toggles-section {
             margin-bottom: 20px;
@@ -422,10 +704,36 @@
             </div>
         </div>
 
-        <!-- Blocker Section (Empty for now) -->
+        <!-- Blocker Section -->
         <div class="blocker-section">
             <div class="section-title">Blocker</div>
-            <!-- Empty section for future features -->
+            <div class="blocker-bar" id="blockerBar">
+                <div class="blocker-toggle" id="blockerToggle">
+                    <div class="slider"></div>
+                </div>
+                <div class="blocker-info">
+                    <span class="blocker-status" id="blockerStatus">Inactive</span>
+                    <div class="blocked-sites-preview">
+                        <span class="site-icon placeholder">🌐</span>
+                        <span class="blocked-count" id="blockedCount">0</span>
+                    </div>
+                </div>
+                <span class="dropdown-arrow" id="blockerDropdownArrow">▼</span>
+            </div>
+            <div class="blocker-dropdown" id="blockerDropdown">
+                <div class="sites-grid" id="sitesGrid">
+                    <!-- Sites will be loaded here -->
+                </div>
+                <div class="custom-sites-section">
+                    <div class="custom-input-container">
+                        <input type="text" class="custom-input" id="customSiteInput" placeholder="Add new site...">
+                        <button class="add-btn" id="addCustomSiteBtn">Add</button>
+                    </div>
+                    <div class="custom-sites-list" id="customSitesList">
+                        <!-- Custom sites will be loaded here -->
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Feature Toggles -->
