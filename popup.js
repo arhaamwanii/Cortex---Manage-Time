@@ -1,5 +1,5 @@
 // Elevate Popup Controller - Full Timer Control Interface v2.1 (Cache Bust)
-console.log('POPUP.JS: Script loaded and executing v3.0 - Enhanced UI Feedback!');
+console.log('POPUP.JS: Script loaded and executing v3.1 - Auto-Enable Blocker & Enhanced UI!');
 
 // State variables
 let timerEnabled = null;
@@ -13,9 +13,15 @@ let isEditingTimer = false; // Track if user is editing timer
 let isBlockingEnabled = null;
 let blockedWebsites = [];
 let popularSocialMediaSites = [
-    'facebook.com', 'instagram.com', 'twitter.com', 'tiktok.com', 'youtube.com',
+    'facebook.com', 'instagram.com', 'x.com', 'tiktok.com', 'youtube.com',
     'reddit.com', 'pinterest.com', 'linkedin.com', 'snapchat.com', 'whatsapp.com'
 ];
+
+// Reminder state variables
+let reminderEnabled = true;
+let reminderVolume = 0.5;
+let reminderFrequency = 2;
+let hasCustomSound = false;
 
 // Performance optimization
 let loadStateDebounceTimeout = null;
@@ -24,8 +30,8 @@ let loadStateDebounceTimeout = null;
 let popularSites = [
     { url: 'youtube.com', name: 'YouTube', icon: 'https://www.youtube.com/favicon.ico' },
     { url: 'facebook.com', name: 'Facebook', icon: 'https://www.facebook.com/favicon.ico' },
-    { url: 'instagram.com', name: 'Instagram', icon: 'https://www.instagram.com/favicon.ico' },
-    { url: 'twitter.com', name: 'Twitter', icon: 'https://twitter.com/favicon.ico' },
+    { url: 'instagram.com', name: 'Instagram', icon: 'https://static.cdninstagram.com/rsrc.php/v3/yI/r/VsNE-OHk_8a.png' },
+    { url: 'x.com', name: 'X (Twitter)', icon: 'https://abs.twimg.com/favicons/twitter.3.ico' },
     { url: 'tiktok.com', name: 'TikTok', icon: 'https://www.tiktok.com/favicon.ico' },
     { url: 'reddit.com', name: 'Reddit', icon: 'https://www.reddit.com/favicon.ico' },
     { url: 'pinterest.com', name: 'Pinterest', icon: 'https://www.pinterest.com/favicon.ico' },
@@ -35,7 +41,7 @@ let popularSites = [
 
 // Wait for DOM to be fully loaded with better detection
 function initializePopup() {
-    console.log('POPUP.JS: Initializing popup with DOM fully ready v3.0...');
+    console.log('POPUP.JS: Initializing popup with DOM fully ready v3.1...');
     
     // Add comprehensive DOM debugging
     console.log('POPUP.JS: DOM state check:', {
@@ -50,7 +56,8 @@ function initializePopup() {
     const criticalElements = [
         'timerDisplay', 'timerStatus', 'startStopBtn', 'resetBtn', 'modeBtn',
         'taskInput', 'taskBtn', 'timerToggle', 'newtabToggle',
-        'blockerToggle', 'blockerStatus', 'blockedCount', 'blockerBar'
+        'blockerToggle', 'blockerStatus', 'blockedCount', 'blockerBar',
+        'reminderToggle', 'reminderStatus', 'reminderBar', 'volumeSlider', 'uploadAudioBtn'
     ];
     
     let allElementsReady = true;
@@ -89,8 +96,8 @@ function initializePopup() {
         return;
     }
     
-    console.log('POPUP.JS: All critical elements found, proceeding with initialization v3.0...');
-    console.log('🎉 POPUP.JS: v3.0 ENHANCED UI FEEDBACK ACTIVE - All instant feedback features loaded!');
+    console.log('POPUP.JS: All critical elements found, proceeding with initialization v3.1...');
+    console.log('🎉 POPUP.JS: v3.1 ENHANCED UI FEEDBACK ACTIVE - All instant feedback features loaded!');
     
     // Setup event listeners first (synchronous)
     setupEventListeners();
@@ -184,11 +191,18 @@ function loadCurrentState() {
             timerEnabled = timerResponse.enabled;
             currentTask = timerResponse.currentTask || '';
             
+            // Update reminder state
+            reminderEnabled = timerResponse.reminderEnabled !== undefined ? timerResponse.reminderEnabled : true;
+            reminderVolume = timerResponse.reminderVolume !== undefined ? timerResponse.reminderVolume : 0.5;
+            reminderFrequency = timerResponse.reminderFrequency !== undefined ? timerResponse.reminderFrequency : 2;
+            hasCustomSound = !!timerResponse.customReminderSound;
+            
             updateTimerDisplay(timerResponse);
             updateTimerToggle();
             updateTaskDisplay();
             updateStopwatchInfo(timerResponse.mode);
             updateTimerControls(timerResponse.isRunning);
+            updateReminderUI();
         } else {
             console.warn('POPUP.JS: No response from background script');
         }
@@ -381,6 +395,9 @@ function setupEventListeners() {
 
     // Website blocker event listeners
     setupBlockerEventListeners();
+    
+    // Reminder control event listeners
+    setupReminderEventListeners();
 }
 
 function startTimerEditing() {
@@ -1419,4 +1436,319 @@ function toggleDropdown() {
 }
 
 // Add to global scope for manual testing
-window.testWebsiteBlocking = testWebsiteBlocking; 
+window.testWebsiteBlocking = testWebsiteBlocking;
+
+// LISTEN FOR BACKGROUND MESSAGES (e.g., auto-enable blocker)
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    console.log('POPUP.JS: 📨 Received message from background:', message);
+    
+    switch (message.action) {
+        case 'blockerAutoEnabled':
+            console.log('POPUP.JS: 🔒 Blocker was auto-enabled for new focus session');
+            // Update local state
+            isBlockingEnabled = message.enabled;
+            blockedWebsites = message.blockedWebsites || blockedWebsites;
+            
+            // Update UI immediately with visual feedback
+            updateBlockerUI();
+            
+            // Show subtle notification (non-intrusive)
+            const toggle = document.getElementById('blockerToggle');
+            if (toggle) {
+                // Flash the toggle briefly to show it was auto-enabled
+                toggle.style.boxShadow = '0 0 10px rgba(255, 165, 0, 0.6)';
+                setTimeout(() => {
+                    toggle.style.boxShadow = '';
+                }, 1000);
+            }
+            
+            console.log('POPUP.JS: ✅ UI updated for auto-enabled blocker');
+            break;
+            
+        default:
+            console.log('POPUP.JS: 🤷 Unknown message action:', message.action);
+    }
+    
+    // Always send response
+    sendResponse({ success: true });
+});
+
+// REMINDER CONTROL FUNCTIONS
+function setupReminderEventListeners() {
+    console.log('POPUP.JS: Setting up reminder event listeners');
+    
+    // Reminder toggle
+    document.getElementById('reminderToggle').addEventListener('click', function(e) {
+        e.stopPropagation();
+        toggleReminder();
+    });
+    
+    // Reminder bar click (dropdown toggle)
+    document.getElementById('reminderBar').addEventListener('click', function(e) {
+        if (e.target.closest('#reminderToggle')) return; // Don't trigger if clicking toggle
+        toggleReminderDropdown();
+    });
+    
+    // Volume slider
+    document.getElementById('volumeSlider').addEventListener('input', function(e) {
+        updateVolume(e.target.value);
+    });
+    
+    // Audio upload
+    document.getElementById('uploadAudioBtn').addEventListener('click', uploadCustomAudio);
+    
+    // Remove audio
+    document.getElementById('removeAudioBtn').addEventListener('click', removeCustomAudio);
+    
+    // Frequency controls
+    document.getElementById('decreaseFreqBtn').addEventListener('click', () => adjustReminderFrequency(-1));
+    document.getElementById('increaseFreqBtn').addEventListener('click', () => adjustReminderFrequency(1));
+}
+
+function updateReminderUI() {
+    console.log('POPUP.JS: Updating reminder UI', {
+        enabled: reminderEnabled,
+        volume: reminderVolume,
+        frequency: reminderFrequency,
+        customSound: hasCustomSound
+    });
+    
+    const toggle = document.getElementById('reminderToggle');
+    const status = document.getElementById('reminderStatus');
+    const bar = document.getElementById('reminderBar');
+    const volumeSlider = document.getElementById('volumeSlider');
+    const volumeDisplay = document.getElementById('volumeDisplay');
+    const freqDisplay = document.getElementById('freqDisplay');
+    const reminderPreviewText = document.getElementById('reminderPreviewText');
+    const uploadBtn = document.getElementById('uploadAudioBtn');
+    const fileStatus = document.getElementById('fileStatus');
+    
+    // Update toggle state
+    if (toggle) {
+        if (reminderEnabled) {
+            toggle.classList.add('active');
+        } else {
+            toggle.classList.remove('active');
+        }
+    }
+    
+    // Update status text
+    if (status) {
+        if (reminderEnabled) {
+            status.textContent = 'Active';
+            status.classList.remove('inactive');
+        } else {
+            status.textContent = 'Inactive';
+            status.classList.add('inactive');
+        }
+    }
+    
+    // Update bar state
+    if (bar) {
+        if (reminderEnabled) {
+            bar.classList.add('active');
+        } else {
+            bar.classList.remove('active');
+        }
+    }
+    
+    // Update volume controls
+    if (volumeSlider && volumeDisplay) {
+        const volumePercent = Math.round(reminderVolume * 100);
+        volumeSlider.value = volumePercent;
+        volumeDisplay.textContent = `${volumePercent}%`;
+    }
+    
+    // Update frequency display
+    if (freqDisplay) {
+        freqDisplay.textContent = reminderFrequency === 0 ? 'Off' : `${reminderFrequency} min`;
+    }
+    
+    // Update preview text
+    if (reminderPreviewText) {
+        if (reminderFrequency === 0) {
+            reminderPreviewText.textContent = 'Off';
+        } else {
+            reminderPreviewText.textContent = `Every ${reminderFrequency} min`;
+        }
+    }
+    
+    // Update custom audio status
+    if (uploadBtn && fileStatus) {
+        if (hasCustomSound) {
+            uploadBtn.style.display = 'none';
+            fileStatus.classList.add('visible');
+        } else {
+            uploadBtn.style.display = 'flex';
+            fileStatus.classList.remove('visible');
+        }
+    }
+}
+
+function toggleReminder() {
+    console.log('POPUP.JS: Toggling reminder enabled:', !reminderEnabled);
+    
+    // Update local state immediately
+    reminderEnabled = !reminderEnabled;
+    
+    // Update UI immediately
+    updateReminderUI();
+    
+    // Send to background
+    chrome.runtime.sendMessage({ 
+        action: 'toggleReminderEnabled', 
+        enabled: reminderEnabled 
+    }, function(response) {
+        if (chrome.runtime.lastError) {
+            console.error('POPUP.JS: Error toggling reminder:', chrome.runtime.lastError);
+            // Revert on error
+            reminderEnabled = !reminderEnabled;
+            updateReminderUI();
+        }
+    });
+}
+
+function updateVolume(value) {
+    const volume = parseInt(value) / 100; // Convert to 0-1 range
+    console.log('POPUP.JS: Updating reminder volume:', volume);
+    
+    // Update local state immediately
+    reminderVolume = volume;
+    
+    // Update display immediately
+    const volumeDisplay = document.getElementById('volumeDisplay');
+    if (volumeDisplay) {
+        volumeDisplay.textContent = `${value}%`;
+    }
+    
+    // Send to background
+    chrome.runtime.sendMessage({ 
+        action: 'updateReminderVolume', 
+        volume: volume 
+    }, function(response) {
+        if (chrome.runtime.lastError) {
+            console.error('POPUP.JS: Error updating volume:', chrome.runtime.lastError);
+        }
+    });
+}
+
+function uploadCustomAudio() {
+    console.log('POPUP.JS: Opening file picker for custom audio');
+    
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'audio/*';
+    input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        console.log('POPUP.JS: Processing uploaded audio file:', file.name);
+        
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const soundDataUrl = event.target.result;
+            
+            // Update local state immediately
+            hasCustomSound = true;
+            
+            // Update file name display
+            const fileName = document.getElementById('fileName');
+            if (fileName) {
+                fileName.textContent = file.name;
+            }
+            
+            // Update UI immediately
+            updateReminderUI();
+            
+            // Send to background
+            chrome.runtime.sendMessage({ 
+                action: 'setCustomSound', 
+                sound: soundDataUrl 
+            }, function(response) {
+                if (chrome.runtime.lastError) {
+                    console.error('POPUP.JS: Error uploading custom sound:', chrome.runtime.lastError);
+                    // Revert on error
+                    hasCustomSound = false;
+                    updateReminderUI();
+                }
+            });
+        };
+        reader.readAsDataURL(file);
+    };
+    input.click();
+}
+
+function removeCustomAudio() {
+    console.log('POPUP.JS: Removing custom audio');
+    
+    // Update local state immediately
+    hasCustomSound = false;
+    
+    // Update UI immediately
+    updateReminderUI();
+    
+    // Send to background
+    chrome.runtime.sendMessage({ action: 'removeCustomSound' }, function(response) {
+        if (chrome.runtime.lastError) {
+            console.error('POPUP.JS: Error removing custom sound:', chrome.runtime.lastError);
+            // Revert on error
+            hasCustomSound = true;
+            updateReminderUI();
+        }
+    });
+}
+
+function adjustReminderFrequency(change) {
+    const newFreq = Math.max(0, Math.min(60, reminderFrequency + change));
+    console.log('POPUP.JS: Adjusting reminder frequency from', reminderFrequency, 'to', newFreq);
+    
+    // Update local state immediately
+    reminderFrequency = newFreq;
+    
+    // Update UI immediately
+    updateReminderUI();
+    
+    // Send to background
+    chrome.runtime.sendMessage({ 
+        action: 'updateReminderFrequency', 
+        frequency: newFreq 
+    }, function(response) {
+        if (chrome.runtime.lastError) {
+            console.error('POPUP.JS: Error updating frequency:', chrome.runtime.lastError);
+            // Revert on error
+            reminderFrequency = reminderFrequency - change;
+            updateReminderUI();
+        }
+    });
+}
+
+function toggleReminderDropdown() {
+    console.log('POPUP.JS: Toggling reminder dropdown');
+    
+    const dropdown = document.getElementById('reminderDropdown');
+    const bar = document.getElementById('reminderBar');
+    const arrow = document.getElementById('reminderDropdownArrow');
+    
+    if (!dropdown || !bar || !arrow) {
+        console.warn('POPUP.JS: Reminder dropdown elements not found');
+        return;
+    }
+    
+    const isCurrentlyVisible = dropdown.classList.contains('visible');
+    
+    if (isCurrentlyVisible) {
+        dropdown.classList.remove('visible');
+        bar.classList.remove('expanded');
+        arrow.style.transform = 'rotate(0deg)';
+    } else {
+        dropdown.classList.add('visible');
+        bar.classList.add('expanded');
+        arrow.style.transform = 'rotate(180deg)';
+    }
+    
+    // Add click animation
+    arrow.style.transform += ' scale(0.9)';
+    setTimeout(() => {
+        arrow.style.transform = arrow.style.transform.replace(' scale(0.9)', '');
+    }, 150);
+}

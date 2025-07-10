@@ -98,7 +98,7 @@ function requestTimerState() {
         updateStartButton(response.isRunning);
         updateTaskDisplay(response.currentTask, response.isRunning, response.mode);
         updateStopwatchDisplay(response.stopwatch);
-        updateFrequencyControls(response.reminderFrequency, response.currentTask, response.customReminderSound);
+        updateFrequencyControls(response.reminderFrequency, response.currentTask, response.customReminderSound, response.reminderEnabled, response.reminderVolume);
       }
       
       // Show/REMOVE timer based on enabled state - COMPLETE REMOVAL, not hiding
@@ -434,7 +434,7 @@ function updateStopwatchDisplay(stopwatch) {
 }
 
 // Update frequency controls
-function updateFrequencyControls(frequency, task, customSound) {
+function updateFrequencyControls(frequency, task, customSound, reminderEnabled, reminderVolume) {
   if (!timerElement) return;
   const freqControls = timerElement.querySelector('.freq-controls');
   const freqValue = timerElement.querySelector('#freq-value');
@@ -444,7 +444,7 @@ function updateFrequencyControls(frequency, task, customSound) {
 
   if (task) {
     freqValue.textContent = frequency === 0 ? 'Off' : `${frequency} min`;
-    if (frequency > 0) {
+    if (frequency > 0 && reminderEnabled) {
         reminderIndicator.style.display = 'block';
         if (customSound) {
             uploadBtn.style.display = 'none';
@@ -554,9 +554,16 @@ function openSoundUpload() {
 
 function playReminderSound() {
   chrome.runtime.sendMessage({action: 'getTimerState'}, function(response) {
-    if (response && response.customReminderSound) {
+    if (!response || !response.reminderEnabled) {
+      console.log('CONTENT: Reminder sound disabled or no response');
+      return;
+    }
+    
+    const volume = response.reminderVolume || 0.5; // Default to 50% if not set
+    
+    if (response.customReminderSound) {
       const audio = new Audio(response.customReminderSound);
-      audio.volume = 0.1; // Play custom sound at a low volume
+      audio.volume = volume; // Use user-configured volume
       audio.play();
     } else {
       // Fallback to generated tone
@@ -567,10 +574,10 @@ function playReminderSound() {
       oscillator.connect(gainNode);
       gainNode.connect(audioCtx.destination);
 
-      // Sound characteristics - softer and shorter
+      // Sound characteristics
       oscillator.type = 'sine';
       oscillator.frequency.setValueAtTime(300, audioCtx.currentTime);
-      gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime); // Very low volume
+      gainNode.gain.setValueAtTime(volume, audioCtx.currentTime); // Use user-configured volume
 
       // Play and stop the sound
       oscillator.start(audioCtx.currentTime);
@@ -610,7 +617,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
       updateStartButton(request.isRunning);
       updateTaskDisplay(request.currentTask, request.isRunning, request.mode);
       updateStopwatchDisplay(request.stopwatch);
-      updateFrequencyControls(request.reminderFrequency, request.currentTask, request.customReminderSound);
+      updateFrequencyControls(request.reminderFrequency, request.currentTask, request.customReminderSound, request.reminderEnabled, request.reminderVolume);
       
       // Skip visibility control on new tab pages - they handle their own state
       if (isNewTabPage()) {
@@ -688,7 +695,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
         updateStartButton(request.isRunning);
         updateTaskDisplay(request.currentTask, request.isRunning, request.mode);
         updateStopwatchDisplay(request.stopwatch);
-        updateFrequencyControls(request.reminderFrequency, request.currentTask, request.customReminderSound);
+        updateFrequencyControls(request.reminderFrequency, request.currentTask, request.customReminderSound, request.reminderEnabled, request.reminderVolume);
         
         if (timerElement) timerElement.style.display = 'block';
         if (reEnableDot) reEnableDot.style.display = 'none';

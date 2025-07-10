@@ -149,7 +149,9 @@ let globalTimer = {
   currentTask: '',
   mode: 'pomodoro', // 'pomodoro' or 'stopwatch'
   reminderFrequency: 2, // in minutes
-  customReminderSound: null
+  customReminderSound: null,
+  reminderVolume: 0.5, // Volume for reminder sounds (0.0 to 1.0)
+  reminderEnabled: true // Master toggle for reminder sounds
 };
 
 let stopwatch = {
@@ -163,7 +165,7 @@ let taskReminderInterval = null;
 // Website blocker state
 let websiteBlockerState = {
   isEnabled: true, // Start enabled for easier testing
-  blockedWebsites: ['youtube.com', 'facebook.com', 'instagram.com', 'twitter.com', 'tiktok.com', 'reddit.com'],
+  blockedWebsites: ['youtube.com', 'facebook.com', 'instagram.com', 'x.com', 'tiktok.com', 'reddit.com'],
   blockedToday: 0,
   customBlockImage: null
 };
@@ -245,6 +247,8 @@ chrome.storage.sync.get(['timerState', 'timerDuration', 'timerEnabled', 'timerVi
     globalTimer.mode = result.timerState.mode || 'pomodoro';
     globalTimer.reminderFrequency = result.timerState.reminderFrequency || 2;
     globalTimer.customReminderSound = result.timerState.customReminderSound || null;
+    globalTimer.reminderVolume = result.timerState.reminderVolume || 0.5;
+    globalTimer.reminderEnabled = result.timerState.reminderEnabled !== undefined ? result.timerState.reminderEnabled : true;
     
     // Resume timer if it was running and enabled
     if (globalTimer.isRunning && globalTimer.enabled) {
@@ -398,6 +402,8 @@ function broadcastTimerUpdate(source = null) {
       stopwatch: stopwatch,
       reminderFrequency: globalTimer.reminderFrequency,
       customReminderSound: globalTimer.customReminderSound,
+      reminderVolume: globalTimer.reminderVolume,
+      reminderEnabled: globalTimer.reminderEnabled,
       disableSource: source
     };
     
@@ -431,7 +437,9 @@ function forceSyncAllTabs() {
       mode: globalTimer.mode,
       stopwatch: stopwatch,
       reminderFrequency: globalTimer.reminderFrequency,
-      customReminderSound: globalTimer.customReminderSound
+      customReminderSound: globalTimer.customReminderSound,
+      reminderVolume: globalTimer.reminderVolume,
+      reminderEnabled: globalTimer.reminderEnabled
     };
     
     validTabs.forEach(tab => {
@@ -468,7 +476,7 @@ function stopStopwatch() {
 
 function startTaskReminder() {
     stopTaskReminder(); // Stop any existing reminder
-    if (!globalTimer.currentTask || !globalTimer.isRunning || globalTimer.reminderFrequency === 0) return;
+    if (!globalTimer.currentTask || !globalTimer.isRunning || globalTimer.reminderFrequency === 0 || !globalTimer.reminderEnabled) return;
 
     const reminderIntervalMs = globalTimer.reminderFrequency * 60 * 1000;
     
@@ -499,7 +507,9 @@ function saveTimerState() {
       currentTask: globalTimer.currentTask,
       mode: globalTimer.mode,
       reminderFrequency: globalTimer.reminderFrequency,
-      customReminderSound: globalTimer.customReminderSound
+      customReminderSound: globalTimer.customReminderSound,
+      reminderVolume: globalTimer.reminderVolume,
+      reminderEnabled: globalTimer.reminderEnabled
     },
     timerEnabled: globalTimer.enabled,
     timerVisible: globalTimer.timerVisible, // Save the new state
@@ -736,7 +746,9 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
         currentTask: globalTimer.currentTask,
         mode: globalTimer.mode,
         reminderFrequency: globalTimer.reminderFrequency,
-        customReminderSound: globalTimer.customReminderSound
+        customReminderSound: globalTimer.customReminderSound,
+        reminderVolume: globalTimer.reminderVolume,
+        reminderEnabled: globalTimer.reminderEnabled
       };
       console.log('BACKGROUND: Sending timer state:', state);
       sendResponse(state);
@@ -747,6 +759,24 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
       if (globalTimer.enabled) {
         startGlobalTimer();
         broadcastTimerUpdate();
+        
+        // AUTO-ENABLE BLOCKER: When a new session starts, automatically enable website blocker
+        if (!websiteBlockerState.isEnabled) {
+          console.log('BACKGROUND: 🔒 Auto-enabling website blocker for new focus session');
+          websiteBlockerState.isEnabled = true;
+          saveWebsiteBlockerState();
+          
+          // Notify popup about the blocker being enabled
+          chrome.runtime.sendMessage({ 
+            action: 'blockerAutoEnabled', 
+            enabled: true, 
+            blockedWebsites: websiteBlockerState.blockedWebsites 
+          }).catch(() => {
+            // Ignore errors if popup is not open
+          });
+        } else {
+          console.log('BACKGROUND: Website blocker already enabled for focus session');
+        }
       }
       sendResponse({ success: true, enabled: globalTimer.enabled, timerVisible: globalTimer.timerVisible });
       break;
@@ -860,6 +890,28 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
         console.log('BACKGROUND: Removing custom sound');
         globalTimer.customReminderSound = null;
         debouncedSaveTimerState();
+        broadcastTimerUpdate();
+        sendResponse({ success: true });
+        break;
+        
+    case 'updateReminderVolume':
+        console.log('BACKGROUND: Updating reminder volume to', request.volume);
+        globalTimer.reminderVolume = Math.max(0, Math.min(1, request.volume)); // Clamp between 0 and 1
+        debouncedSaveTimerState();
+        broadcastTimerUpdate();
+        sendResponse({ success: true });
+        break;
+        
+    case 'toggleReminderEnabled':
+        console.log('BACKGROUND: Toggling reminder enabled to', request.enabled);
+        globalTimer.reminderEnabled = request.enabled;
+        if (!request.enabled) {
+            stopTaskReminder(); // Stop reminders if disabled
+        } else if (globalTimer.currentTask && globalTimer.isRunning && globalTimer.reminderFrequency > 0) {
+            startTaskReminder(); // Start reminders if enabled and conditions are met
+        }
+        debouncedSaveTimerState();
+        broadcastTimerUpdate();
         sendResponse({ success: true });
         break;
         

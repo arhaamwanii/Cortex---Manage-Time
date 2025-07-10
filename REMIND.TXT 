@@ -52,5 +52,21 @@ FIX THE POPUP UI DON'T BREAK THE FUCNTIONLITY
     JUST TAKE INSPIRATIPON FROM THE TAGGED FILES, TAKE A DEEP LOOK INTO ATTACHED FILES 
     GET ANY NEW PERMISION AND STUFF IF NEEDED @MANIFEST.JSON
 
-- SETTINGS PAGE ADD 
-    - BELOW THE CONTROLLS PAGE THERE SHOULD BE A SETTIGN REMINDER SETTINGS SECTIONG WHICH SHOULD HAVE 
+- REMINDER CONTROL SECTION 
+    - BELOW THE THE BLOCKER AND ABOVE THE CONTROLS, CREATE A REMINDERS SECTION 
+    - ITS OUTSIE UI SHOULD LOOK JUST LIKE THE BLOCKER UI WITH AN ON OFF TOGGEL AND A DROP DROWN MEENU
+        a. this on off button should turn on the reminder sound on or off 
+    - first option should be vlume user should be able to conrol volume of the beep which happens by default (it should be possible to take it should very loud)
+        - be able to control audio with it of the uplaoded audio/beep
+    - seocond option  uplaod custom audio to be palyed
+        - - once uploaded it should trun into a icon shows that audio file the a cross on its corner when pressed it remove that audio and then allows to upload a new one 
+    - third option freqency it is like the reminder 
+        - llike howoftenn should this sound be played 
+
+some of this functionlatiy should already be there, at least the basis for it. take a look into the code base and see will that work and what changes you would need to make to it work 
+
+analyze what i said and above take a deep look into the code base then go and make changes - make sure it workd , make sure it matchs app theme 
+
+DON'T BREAK ANYTHIGN 
+
+- CHANGE TEH TEXT COLOUR OF THE REMINDER AND OTHR HEADERS ALL HEADERS LIKE THESE TO WHITE 

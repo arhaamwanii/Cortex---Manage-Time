@@ -567,6 +567,278 @@
             color: #ff4444;
         }
 
+        /* Reminder Section */
+        .reminder-section {
+            margin-bottom: 20px;
+        }
+
+        /* Reminder Bar */
+        .reminder-bar {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 12px 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .reminder-bar:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .reminder-bar.active {
+            border-color: rgba(76, 175, 80, 0.3);
+            background: rgba(76, 175, 80, 0.05);
+        }
+
+        .reminder-toggle {
+            width: 36px;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            position: relative;
+            transition: all 0.3s ease;
+            flex-shrink: 0;
+        }
+
+        .reminder-toggle.active {
+            background: #4CAF50;
+        }
+
+        .reminder-toggle .slider {
+            width: 16px;
+            height: 16px;
+            background: #ffffff;
+            border-radius: 50%;
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            transition: all 0.3s ease;
+        }
+
+        .reminder-toggle.active .slider {
+            transform: translateX(16px);
+            background: #000000;
+        }
+
+        .reminder-info {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .reminder-status {
+            font-size: 12px;
+            font-weight: 600;
+            color: #ffffff;
+        }
+
+        .reminder-status.inactive {
+            color: #888;
+        }
+
+        .reminder-preview {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .sound-icon {
+            font-size: 14px;
+            color: #888;
+        }
+
+        .reminder-preview-text {
+            font-size: 11px;
+            color: #888;
+        }
+
+        /* Reminder Dropdown */
+        .reminder-dropdown {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-top: none;
+            border-radius: 0 0 10px 10px;
+            padding: 16px;
+            margin-top: -1px;
+            display: none;
+            animation: slideDown 0.3s ease;
+        }
+
+        .reminder-dropdown.visible {
+            display: block;
+        }
+
+        .reminder-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .control-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #ffffff;
+        }
+
+        .volume-control {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .volume-slider {
+            flex: 1;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            outline: none;
+            appearance: none;
+        }
+
+        .volume-slider::-webkit-slider-thumb {
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #4CAF50;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .volume-slider::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            background: #4CAF50;
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+        }
+
+        .volume-display {
+            font-size: 11px;
+            color: #888;
+            min-width: 35px;
+            text-align: right;
+            font-family: monospace;
+        }
+
+        .upload-section {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .upload-area {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .upload-btn {
+            background: rgba(76, 175, 80, 0.2);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            color: #4CAF50;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .upload-btn:hover {
+            background: rgba(76, 175, 80, 0.3);
+            border-color: rgba(76, 175, 80, 0.5);
+        }
+
+        .file-status {
+            display: none;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 8px;
+            background: rgba(76, 175, 80, 0.1);
+            border: 1px solid rgba(76, 175, 80, 0.2);
+            border-radius: 6px;
+            font-size: 11px;
+            color: #4CAF50;
+        }
+
+        .file-status.visible {
+            display: flex;
+        }
+
+        .file-icon {
+            font-size: 12px;
+        }
+
+        .file-remove {
+            background: none;
+            border: none;
+            color: #ff6b6b;
+            cursor: pointer;
+            padding: 0;
+            font-size: 12px;
+            font-weight: bold;
+            transition: color 0.2s ease;
+        }
+
+        .file-remove:hover {
+            color: #ff4444;
+        }
+
+        .frequency-control {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .freq-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #ffffff;
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .freq-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .freq-display {
+            flex: 1;
+            text-align: center;
+            font-size: 12px;
+            color: #ccc;
+            font-family: monospace;
+            padding: 6px 12px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+        }
+
         /* Toggle Cards */
         .toggles-section {
             margin-bottom: 20px;
@@ -731,6 +1003,61 @@
                     </div>
                     <div class="custom-sites-list" id="customSitesList">
                         <!-- Custom sites will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reminder Section -->
+        <div class="reminder-section">
+            <div class="section-title">Reminders</div>
+            <div class="reminder-bar" id="reminderBar">
+                <div class="reminder-toggle" id="reminderToggle">
+                    <div class="slider"></div>
+                </div>
+                <div class="reminder-info">
+                    <span class="reminder-status" id="reminderStatus">Active</span>
+                    <div class="reminder-preview">
+                        <span class="sound-icon">🔔</span>
+                        <span class="reminder-preview-text" id="reminderPreviewText">Every 2 min</span>
+                    </div>
+                </div>
+                <span class="dropdown-arrow" id="reminderDropdownArrow">▼</span>
+            </div>
+            <div class="reminder-dropdown" id="reminderDropdown">
+                <div class="reminder-controls">
+                    <div class="control-group">
+                        <div class="control-label">Volume</div>
+                        <div class="volume-control">
+                            <input type="range" class="volume-slider" id="volumeSlider" min="0" max="100" value="50">
+                            <div class="volume-display" id="volumeDisplay">50%</div>
+                        </div>
+                    </div>
+                    
+                    <div class="control-group">
+                        <div class="control-label">Custom Audio</div>
+                        <div class="upload-section">
+                            <div class="upload-area">
+                                <button class="upload-btn" id="uploadAudioBtn">
+                                    <span>📁</span>
+                                    <span>Upload Audio</span>
+                                </button>
+                                <div class="file-status" id="fileStatus">
+                                    <span class="file-icon">🎵</span>
+                                    <span id="fileName">custom.mp3</span>
+                                    <button class="file-remove" id="removeAudioBtn">×</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="control-group">
+                        <div class="control-label">Frequency</div>
+                        <div class="frequency-control">
+                            <button class="freq-btn" id="decreaseFreqBtn">−</button>
+                            <div class="freq-display" id="freqDisplay">2 min</div>
+                            <button class="freq-btn" id="increaseFreqBtn">+</button>
+                        </div>
                     </div>
                 </div>
             </div>

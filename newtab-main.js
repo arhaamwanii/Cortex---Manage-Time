@@ -93,55 +93,96 @@ function createBlockedMessage() {
         display: none;
         text-align: center;
         color: #ffffff;
-        max-width: 600px;
-        margin: 0 auto;
+        width: 100%;
+        height: 100vh;
+        position: fixed;
+        top: 0;
+        left: 0;
+        background: #000000;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 40px;
         padding: 40px 20px;
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 12px;
-        backdrop-filter: blur(10px);
     `;
     
-    blockedMessage.innerHTML = `
-        <div style="font-size: 48px; margin-bottom: 20px;">🚫</div>
-        <h2 style="color: #FFA500; margin-bottom: 16px; font-size: 24px;">Website Blocked</h2>
-        <p style="color: #cccccc; margin-bottom: 8px; font-size: 16px;">
-            <span class="blocked-url" style="color: #FFA500; font-weight: 600;"></span> is currently blocked.
-        </p>
-        <p style="color: #888; margin-bottom: 30px; font-size: 14px;">
-            Stay focused on your current task. You can manage blocked sites in the extension popup.
-        </p>
-        <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
-            <button onclick="history.back()" style="
-                background: rgba(255, 255, 255, 0.1);
-                border: 1px solid rgba(255, 255, 255, 0.2);
-                color: #ffffff;
-                padding: 12px 24px;
-                border-radius: 8px;
-                cursor: pointer;
-                font-size: 14px;
-                transition: all 0.3s ease;
-            " onmouseover="this.style.background='rgba(255, 255, 255, 0.15)'" onmouseout="this.style.background='rgba(255, 255, 255, 0.1)'">
-                ← Go Back
-            </button>
-            <button onclick="window.location.href='chrome://newtab/'" style="
-                background: #FFA500;
-                border: none;
-                color: #000000;
-                padding: 12px 24px;
-                border-radius: 8px;
-                cursor: pointer;
-                font-size: 14px;
-                font-weight: 600;
-                transition: all 0.3s ease;
-            " onmouseover="this.style.background='#FF8C00'" onmouseout="this.style.background='#FFA500'">
-                New Tab
-            </button>
-        </div>
+    // Create the timer display (read-only, no controls)
+    const timerDisplay = document.createElement('div');
+    timerDisplay.className = 'blocked-page-timer';
+    timerDisplay.style.cssText = `
+        font-family: 'SF Mono', Consolas, 'Courier New', monospace;
+        font-size: 72px;
+        font-weight: 700;
+        color: #FFA500;
+        text-align: center;
+        letter-spacing: 4px;
+        margin-bottom: 20px;
+        text-shadow: 0 0 20px rgba(255, 165, 0, 0.3);
     `;
+    timerDisplay.textContent = '25:00';
+    timerDisplay.id = 'blockedPageTimer';
+    
+    // Create the subtitle text
+    const subtitle = document.createElement('div');
+    subtitle.style.cssText = `
+        font-size: 24px;
+        color: #888;
+        font-weight: 300;
+        text-align: center;
+        letter-spacing: 1px;
+    `;
+    subtitle.textContent = 'Rise Above Distractions';
+    
+    // Add elements to the blocked message
+    blockedMessage.appendChild(timerDisplay);
+    blockedMessage.appendChild(subtitle);
     
     document.body.appendChild(blockedMessage);
-    debugLog('Created blocked message element');
+    debugLog('Created minimal blocked page with timer and motto');
+    
+    // Start requesting timer updates for the blocked page
+    startBlockedPageTimerUpdates();
+}
+
+// Function to update the timer on the blocked page
+function startBlockedPageTimerUpdates() {
+    debugLog('Starting blocked page timer updates...');
+    
+    function updateBlockedPageTimer() {
+        chrome.runtime.sendMessage({ action: 'getTimerState' }, function(response) {
+            if (chrome.runtime.lastError) {
+                debugLog('Error getting timer state for blocked page:', chrome.runtime.lastError);
+                return;
+            }
+            
+            if (response && response.timeLeft !== undefined) {
+                const minutes = Math.floor(response.timeLeft / 60);
+                const seconds = response.timeLeft % 60;
+                const timeString = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                
+                const timerElement = document.getElementById('blockedPageTimer');
+                if (timerElement) {
+                    timerElement.textContent = timeString;
+                    
+                    // Add visual feedback for running/paused state
+                    if (response.isRunning) {
+                        timerElement.style.color = '#FFA500';
+                        timerElement.style.textShadow = '0 0 20px rgba(255, 165, 0, 0.3)';
+                    } else {
+                        timerElement.style.color = '#666';
+                        timerElement.style.textShadow = '0 0 10px rgba(102, 102, 102, 0.2)';
+                    }
+                }
+            }
+        });
+    }
+    
+    // Update immediately
+    updateBlockedPageTimer();
+    
+    // Update every second
+    setInterval(updateBlockedPageTimer, 1000);
 }
 
 // Create EXACT same timer as floating version - using CSS classes
