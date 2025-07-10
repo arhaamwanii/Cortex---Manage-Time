@@ -40,6 +40,10 @@ The extension seamlessly integrates into your workflow by replacing your new tab
 - Task labeling system to keep you focused on current objectives
 - One-click mode switching between Pomodoro and Stopwatch
 
+<div align="center">
+  <img src="assets/1.png" alt="Core Timer Controls" width="700">
+</div>
+
 ### Advanced Productivity Features
 
 **Intelligent Website Blocking**
@@ -49,6 +53,10 @@ The extension seamlessly integrates into your workflow by replacing your new tab
 - Visual website icons in blocking interface for easy management
 - Redirects blocked sites to your focused new tab workspace
 - Toggle blocking on/off instantly from popup interface
+
+<div align="center">
+  <img src="assets/2.png" alt="Intelligent Website Blocking" width="700">
+</div>
 
 **Smart Audio Reminder System**
 - Standalone audio reminders independent of timer state
@@ -64,6 +72,10 @@ The extension seamlessly integrates into your workflow by replacing your new tab
 - Distraction-free black background environment
 - Toggleable - can be disabled to restore default Chrome new tab
 - Maintains all timer functionality in new tab environment
+
+<div align="center">
+  <img src="assets/3.png" alt="New Tab Workspace" width="700">
+</div>
 
 ### User Experience Enhancements
 
@@ -155,6 +167,10 @@ During installation, Chrome will request the following permissions:
 5. **Reset**: Click "Reset" to return to default duration
 6. **Switch Modes**: Click the mode button to toggle between Pomodoro and Stopwatch
 
+<div align="center">
+  <img src="assets/4.png" alt="Timer Operations" width="700">
+</div>
+
 ### Advanced Features
 
 **Website Blocking**
@@ -164,6 +180,10 @@ During installation, Chrome will request the following permissions:
 4. Click the dropdown arrow to customize blocked sites
 5. Add custom websites or remove pre-configured ones
 6. Sites with orange highlighting are currently blocked
+
+<div align="center">
+  <img src="assets/5.png" alt="Website Blocker Settings" width="700">
+</div>
 
 **Audio Reminders**
 1. In the popup, find the "Reminders" section
